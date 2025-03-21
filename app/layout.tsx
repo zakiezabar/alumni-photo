@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Mono } from "next/font/google";
 import "./globals.css";
+import { ClerkLoaded, ClerkLoading, ClerkProvider } from "@clerk/nextjs";
+import Navbar from "@/components/Navbar";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const spaceMono = Space_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'], // Specify weights if needed
+  variable: '--font-space-mono', // Optional CSS variable for custom use
 });
 
 export const metadata: Metadata = {
@@ -23,12 +21,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
-    </html>
+    <ClerkProvider
+      afterSignOutUrl={"/"}
+    >
+      <html lang="en">
+        <body
+          className={spaceMono.className}
+        >
+          <ClerkLoading>
+            <Navbar />
+            <div className="h-screen flex flex-col items-center text-sm justify-center font-mono p-4 bg-slate-100">
+              Loading...
+            </div>            
+          </ClerkLoading>
+          <ClerkLoaded>
+            <Navbar />  
+            <div className="h-screen flex flex-col items-center justify-center">
+              {children}
+            </div>
+          </ClerkLoaded>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
