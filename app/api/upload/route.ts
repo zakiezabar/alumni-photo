@@ -1,4 +1,3 @@
-// app/api/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
@@ -146,7 +145,7 @@ export async function POST(request: NextRequest) {
           s3Url: s3Result.url,
           userId: user.id,
           createdAt: new Date(), // Explicitly set the date
-          moderation: moderationResult as ModerationResult,
+          moderation: JSON.parse(JSON.stringify(moderationResult)),
           description: (formData.get("description") as string) || null,
         },
       });

@@ -5,13 +5,19 @@ import prisma from "@/lib/prisma";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { s3Client, S3_BUCKET_NAME } from "@/lib/aws";
 
+// This approach uses segment config
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
 ) {
   try {
     // Get the photo ID from the URL
-    const { id: photoId } = context.params;
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const photoId = pathSegments[pathSegments.length - 1];
+
+    console.log("Attempting to delete photo with ID:", photoId)
     
     // Verify authentication
     const { userId } = await auth();
