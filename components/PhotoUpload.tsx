@@ -66,7 +66,7 @@ const PhotoUpload = ({ onPhotosChange, maxPhotos = 10 }: PhotoUploadProps) => {
     <div className="w-full space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Upload Photos</h3>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-mono-500">
           {photos.length} / {maxPhotos} photos
         </span>
       </div>
@@ -98,10 +98,10 @@ const PhotoUpload = ({ onPhotosChange, maxPhotos = 10 }: PhotoUploadProps) => {
         {photos.length < maxPhotos && (
           <button
             onClick={triggerFileInput}
-            className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md hover:border-gray-400 transition-colors p-4"
+            className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-mono-300 rounded-md hover:border-mono-400 transition-colors p-4"
           >
-            <Upload className="w-8 h-8 text-gray-400 mb-2" />
-            <span className="text-sm text-gray-500">Upload</span>
+            <Upload className="w-8 h-8 text-mono-400 mb-2" />
+            <span className="text-sm text-mono-500">Upload</span>
           </button>
         )}
       </div>
@@ -117,7 +117,7 @@ const PhotoUpload = ({ onPhotosChange, maxPhotos = 10 }: PhotoUploadProps) => {
       />
       
       {/* Instructions */}
-      <div className="flex items-center gap-2 text-sm text-gray-500">
+      <div className="flex items-center gap-2 text-sm text-mono-500">
         <ImageIcon className="w-4 h-4" />
         <p>Click on the upload button to add photos (max {maxPhotos})</p>
       </div>

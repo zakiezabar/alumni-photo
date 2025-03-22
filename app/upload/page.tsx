@@ -5,13 +5,14 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
 import Image from "next/image";
-import { Camera } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
 
 export default function UploadPage() {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
-  
+
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [description, setDescription] = useState("");
@@ -20,7 +21,7 @@ export default function UploadPage() {
   const [uploadCount, setUploadCount] = useState(0);
   const [remainingUploads, setRemainingUploads] = useState(10);
   const maxUploads = 10; // Maximum number of photos allowed
-  
+
   // Redirect if not signed in - moved to useEffect
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -32,10 +33,10 @@ export default function UploadPage() {
   useEffect(() => {
     const fetchPhotoCount = async () => {
       if (!isSignedIn) return;
-      
+
       try {
         const response = await fetch("/api/user/photo-count");
-        
+
         if (response.ok) {
           const data = await response.json();
           setUploadCount(data.count);
@@ -45,7 +46,7 @@ export default function UploadPage() {
         console.error("Failed to fetch photo count:", error);
       }
     };
-    
+
     fetchPhotoCount();
   }, [isSignedIn]);
 
@@ -54,14 +55,14 @@ export default function UploadPage() {
     const selectedFile = acceptedFiles[0];
     if (selectedFile) {
       setFile(selectedFile);
-      
+
       // Create preview
       const reader = new FileReader();
       reader.onload = () => {
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(selectedFile);
-      
+
       setError(null);
     }
   }, []);
@@ -69,56 +70,57 @@ export default function UploadPage() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
     },
     maxFiles: 1,
-    multiple: false
+    multiple: false,
   });
 
   // Handle upload
   const handleUpload = async () => {
     if (!file || !user) return;
-    
+
     // Check if user has reached upload limit
     if (remainingUploads <= 0) {
       setError("You've reached the maximum number of uploads (10 photos).");
       return;
     }
-    
+
     setIsUploading(true);
     setError(null);
-    
+
     try {
       const formData = new FormData();
       formData.append("file", file);
       if (description) {
         formData.append("description", description);
       }
-      
+
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
-      
+
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.reason || result.error || "Upload failed");
       }
-      
+
       // Success - update count and reset form
-      setUploadCount(prev => prev + 1);
-      setRemainingUploads(prev => prev - 1);
+      setUploadCount((prev) => prev + 1);
+      setRemainingUploads((prev) => prev - 1);
       setFile(null);
       setPreview(null);
       setDescription("");
-      
+
       // If user has reached the limit, redirect to gallery
       if (remainingUploads <= 1) {
         router.push("/gallery");
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload image';
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to upload image";
       setError(errorMessage);
     } finally {
       setIsUploading(false);
@@ -131,14 +133,14 @@ export default function UploadPage() {
     input.type = "file";
     input.accept = "image/*";
     input.capture = "environment"; // For rear camera
-    
+
     input.onchange = (e) => {
       const target = e.target as HTMLInputElement;
       if (target.files && target.files[0]) {
         onDrop([target.files[0]]);
       }
     };
-    
+
     input.click();
   };
 
@@ -153,130 +155,197 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Upload Your Event Photos</h1>
-      
+    <div className="max-w-2xl mx-auto p-4 justify-center">
+      <h1 className="text-2xl font-bold mb-6 text-center text-primary-400">
+        Share Your Best Moments!
+      </h1>
+      <div className="relative mt-12 lg:mt-4 lg:grid lg:grid-cols-1 lg:gap-8 lg:items-center bg-mono-100/10 rounded-2xl">
+        <div className="mt-10 -mx-4 relative lg:mt-0">
+          <div className="relative space-y-4 px-12 py-5">
+            {[
+              {
+                number: "01",
+                description:
+                  "Choose your favorite photo from the event.",
+              },
+              {
+                number: "02",
+                description:
+                  "Make sure it’s clear and appropriate.",
+              },
+              {
+                number: "03",
+                description:
+                  "Hit “Upload” and your memory will light up the big screen!",
+              },
+            ].map((step) => (
+              <div
+                key={step.number}
+                className="flex items-center space-x-4"
+              >
+                {/* Fixed-size circular number indicator */}
+                <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-primary-400 text-secondary-800">
+                  <span className="text-sm font-bold">
+                    {step.number.toString().padStart(2, "0")}
+                  </span>
+                </div>
+
+                {/* Content */}
+                <div>
+                  <p className="text-base text-secondary-200">
+                    {step.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Progress indicator */}
-      <div className="mb-8">
-        <p className="text-lg mb-2">
-          {uploadCount} of {maxUploads} photos uploaded ({remainingUploads} remaining)
+      <div className="mb-8 mt-12">
+        <p className="text-lg mb-2 text-primary-400 justify-center text-center">
+          {uploadCount} of {maxUploads} photos uploaded ({remainingUploads}{" "}
+          remaining)
         </p>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            className="bg-blue-600 h-2.5 rounded-full" 
+        <div className="w-full bg-mono-200 rounded-full h-2.5">
+          <div
+            className="bg-rose-600 h-2.5 rounded-full"
             style={{ width: `${(uploadCount / maxUploads) * 100}%` }}
           ></div>
         </div>
         {remainingUploads <= 0 && (
           <p className="text-red-500 mt-2">
-            You have reached the maximum number of uploads. Please delete some photos if you want to upload more.
+            You have reached the maximum number of uploads. Please delete some
+            photos if you want to upload more.
           </p>
         )}
       </div>
-      
+
       {/* Dropzone */}
       {remainingUploads <= 0 ? (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700">
-          You have reached the maximum upload limit of {maxUploads} photos. 
-          Please visit your dashboard to delete some photos if you want to upload more.
+          You have reached the maximum upload limit of {maxUploads} photos.
+          Please visit your dashboard to delete some photos if you want to
+          upload more.
         </div>
       ) : !preview ? (
         <div className="mb-6">
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition ${
-              isDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
+            className={`border-1 border-dashed rounded-lg p-8 text-center cursor-pointer transition bg-secondary-600/50 ${
+              isDragActive ? "border-blue-500 bg-blue-50" : "border-mono-300"
             }`}
           >
             <input {...getInputProps()} />
-            <p className="text-lg mb-2">Drag & drop an image here, or click to select</p>
-            <p className="text-sm text-gray-500 mb-4">Supported formats: JPG, PNG, GIF</p>
+            <p className="text-lg mb-2 text-mono-200">
+              Drag & drop an image here, or click to select
+            </p>
+            <p className="text-sm text-mono-400 mb-4">
+              Supported formats: JPG, PNG, GIF
+            </p>
           </div>
-          
+
           {/* Camera capture button */}
-          <button
+          <div className="mt-4">
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleCameraCapture}
+              className="w-full"
+            >
+              <Camera className="mr-2" size={20} />
+              Take a Photo
+            </Button>
+          </div>
+          {/* <button
             type="button"
             onClick={handleCameraCapture}
-            className="mt-4 flex items-center justify-center w-full py-2 bg-gray-100 rounded-md hover:bg-gray-200"
+            className="mt-4 flex items-center justify-center w-full py-2 bg-mono-100 rounded-md hover:bg-mono-200"
           >
             <Camera className="mr-2" size={20} />
             Take a Photo
-          </button>
+          </button> */}
         </div>
       ) : (
         /* Image preview */
         <div className="mb-6">
-          <div className="relative aspect-video w-full mb-4 bg-gray-100 rounded-lg overflow-hidden">
+          <div className="relative aspect-video w-full mb-4 bg-mono-100 rounded-lg overflow-hidden">
             <Image
               src={preview}
               alt="Preview"
               fill
-              className="object-contain"
+              className="object-cover"
             />
-          </div>
-          
-          <div className="flex space-x-2">
-            <button
-              onClick={() => {
-                setFile(null);
-                setPreview(null);
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100"
-            >
-              Cancel
-            </button>
+            <div className="absolute bottom-2 left-2 flex space-x-2">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setFile(null);
+                  setPreview(null);
+                }}
+                className="text-mono-100"
+              >
+                <X /> Cancel
+              </Button>
+            </div>
           </div>
         </div>
       )}
-      
+
       {/* Description field */}
       {preview && (
         <div className="mb-6">
-          <label htmlFor="description" className="block mb-2 text-sm font-medium">
+          <label
+            htmlFor="description"
+            className="block mb-2 text-sm font-medium text-mono-400"
+          >
             Description (optional)
           </label>
           <textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md"
+            className="w-full p-2 border border-mono-300 rounded-md text-mono-100 bg-secondary-600/50"
             rows={2}
             placeholder="Add a description..."
           ></textarea>
         </div>
       )}
-      
+
       {/* Error message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
           {error}
         </div>
       )}
-      
+
       {/* Upload button */}
       {preview && (
-        <button
+        <Button
+          variant="primary"
           onClick={handleUpload}
           disabled={isUploading || !file}
-          className={`w-full py-3 rounded-md text-white font-medium ${
+          className={`w-full py-6 rounded-md text-secondary-600 ${
             isUploading
-              ? "bg-blue-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
+              ? "bg-secondary-400 cursor-not-allowed text-primary-400 transition duration-700 ease-in-out"
+              : "bg-primary-400 hover:bg-primary-600"
           }`}
         >
-          {isUploading ? "Uploading..." : "Upload Photo"}
-        </button>
+          {isUploading ? "Validating..." : "Validate & Upload"}
+        </Button>
       )}
-      
+
       {/* Gallery link */}
       {uploadCount > 0 && (
-        <div className="mt-8 text-center">
-          <button
+        <div className="mt-4 text-center">
+          <Button
+            variant="ghost"
             onClick={() => router.push("/gallery")}
-            className="text-blue-600 hover:underline"
+            className="text-secondary-200 hover:underline hover:bg-transparent hover:text-secondary-300 py-6 w-full"
           >
             View the gallery ({uploadCount} photos)
-          </button>
+          </Button>
         </div>
       )}
     </div>

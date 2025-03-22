@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { Camera } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Photo {
   id: string;
@@ -64,18 +66,20 @@ export default function GalleryPage() {
   return (
     <div className="max-w-6xl mx-auto p-4">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Event Photo Gallery</h1>
+        <h1 className="text-2xl font-bold text-center text-mono-100">Event Photo Gallery</h1>
         
         {isSignedIn && (
-          <Link href="/upload" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            Upload Photos
+          <Link href="/upload">
+            <Button variant="primary" size="lg" className="w-full">
+              <Camera className="w-16 h-16" /> Upload photos
+            </Button>
           </Link>
         )}
       </div>
       
       {isLoading && photos.length === 0 ? (
         <div className="flex justify-center items-center h-64">
-          <p className="text-lg text-gray-500">Loading gallery...</p>
+          <p className="text-lg text-mono-500">Loading gallery...</p>
         </div>
       ) : error ? (
         <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
@@ -85,11 +89,11 @@ export default function GalleryPage() {
         <div className="text-center py-12">
           <p className="text-lg mb-4">No photos have been uploaded yet.</p>
           {isSignedIn ? (
-            <Link href="/upload" className="text-blue-600 hover:underline">
+            <Link href="/upload" className="text-secondary-400 hover:underline">
               Be the first to upload a photo!
             </Link>
           ) : (
-            <Link href="/sign-in" className="text-blue-600 hover:underline">
+            <Link href="/sign-in" className="text-secondary-400 hover:underline">
               Sign in to upload photos
             </Link>
           )}
@@ -111,7 +115,7 @@ export default function GalleryPage() {
                 
                 <div className="p-4">
                   {photo.description && (
-                    <p className="text-gray-700 mb-2">{photo.description}</p>
+                    <p className="text-mono-700 mb-2">{photo.description}</p>
                   )}
                   
                   <div className="flex items-center mt-2">
@@ -124,14 +128,14 @@ export default function GalleryPage() {
                         className="rounded-full mr-2"
                       />
                     ) : (
-                      <div className="w-6 h-6 bg-gray-200 rounded-full mr-2"></div>
+                      <div className="w-6 h-6 bg-mono-200 rounded-full mr-2"></div>
                     )}
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-mono-500">
                       {photo.user.name || "Anonymous"}
                     </span>
                   </div>
                   
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-mono-400 mt-1">
                     {new Date(photo.createdAt).toLocaleString()}
                   </p>
                 </div>
@@ -148,8 +152,8 @@ export default function GalleryPage() {
                   disabled={pagination.currentPage === 1}
                   className={`px-3 py-1 rounded-md ${
                     pagination.currentPage === 1
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-gray-200 hover:bg-gray-300"
+                      ? "bg-mono-100 text-mono-400 cursor-not-allowed"
+                      : "bg-mono-200 hover:bg-mono-300"
                   }`}
                 >
                   Previous
@@ -167,7 +171,7 @@ export default function GalleryPage() {
                       return (
                         <span 
                           key={`ellipsis-${page}`}
-                          className="px-3 py-1 text-gray-400"
+                          className="px-3 py-1 text-mono-400"
                         >
                           ...
                         </span>
@@ -180,8 +184,8 @@ export default function GalleryPage() {
                         onClick={() => handlePageChange(page)}
                         className={`px-3 py-1 rounded-md ${
                           pagination.currentPage === page
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-200 hover:bg-gray-300"
+                            ? "bg-secondary-400 text-white"
+                            : "bg-mono-200 hover:bg-mono-300"
                         }`}
                       >
                         {page}
@@ -194,8 +198,8 @@ export default function GalleryPage() {
                   disabled={pagination.currentPage === pagination.pages}
                   className={`px-3 py-1 rounded-md ${
                     pagination.currentPage === pagination.pages
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-gray-200 hover:bg-gray-300"
+                      ? "bg-mono-100 text-mono-400 cursor-not-allowed"
+                      : "bg-mono-200 hover:bg-mono-300"
                   }`}
                 >
                   Next

@@ -20,39 +20,39 @@ export default function Navigation() {
   ];
 
   return (
-    <nav className="bg-white shadow-sm">
+    <nav className="bg-primary-400 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="text-xl font-bold text-blue-600">
-                UiTM Photo Event
+              <Link href="/" className="text-xl font-bold text-secondary-400">
+                Share moments!
               </Link>
             </div>
-            
-            {/* Desktop navigation */}
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              {navigation.map((item) => {
-                // Don't show Upload and My Photos if not signed in
-                if (!isSignedIn && (item.href === "/upload" || item.href === "/dashboard")) {
-                  return null;
-                }
-                
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                      pathname === item.href
-                        ? "border-blue-500 text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </div>
+          </div>
+
+          {/* Desktop navigation */}
+          <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            {navigation.map((item) => {
+              // Don't show Upload and My Photos if not signed in
+              if (!isSignedIn && (item.href === "/upload" || item.href === "/dashboard")) {
+                return null;
+              }
+              
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                    pathname === item.href
+                      ? "border-primary-800 text-mono-900"
+                      : "border-transparent text-mono-600 hover:text-mono-700 hover:border-primary-600"
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              );
+            })}
           </div>
           
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
@@ -60,7 +60,7 @@ export default function Navigation() {
               <UserButton afterSignOutUrl="/" />
             ) : (
               <SignInButton mode="modal">
-                <button className="bg-blue-600 px-4 py-2 rounded-md text-white text-sm font-medium hover:bg-blue-700">
+                <button className="bg-secondary-400 px-4 py-2 rounded-md text-white text-sm font-medium hover:bg-secondary-600">
                   Sign In
                 </button>
               </SignInButton>
@@ -71,7 +71,7 @@ export default function Navigation() {
           <div className="flex items-center sm:hidden">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              className="inline-flex items-center justify-center p-2 rounded-md text-mono-400 hover:text-mono-500 hover:bg-mono-100"
             >
               {isMenuOpen ? (
                 <X className="block h-6 w-6" />
@@ -100,7 +100,7 @@ export default function Navigation() {
                   className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
                     pathname === item.href
                       ? "bg-blue-50 border-blue-500 text-blue-700"
-                      : "border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700"
+                      : "border-transparent text-mono-500 hover:bg-mono-50 hover:border-mono-300 hover:text-mono-700"
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
@@ -110,7 +110,7 @@ export default function Navigation() {
             })}
           </div>
           
-          <div className="pt-4 pb-3 border-t border-gray-200">
+          <div className="pt-4 pb-3 border-t border-mono-200">
             <div className="flex items-center px-4">
               {isSignedIn ? (
                 <div className="ml-auto">
@@ -119,7 +119,7 @@ export default function Navigation() {
               ) : (
                 <div className="ml-auto">
                   <SignInButton mode="modal">
-                    <button className="bg-blue-600 px-4 py-2 rounded-md text-white text-sm font-medium hover:bg-blue-700">
+                    <button className="bg-secondary-400 px-4 py-2 rounded-md text-white text-sm font-medium hover:bg-blue-700">
                       Sign In
                     </button>
                   </SignInButton>
