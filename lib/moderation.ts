@@ -1,6 +1,7 @@
 import { 
   DetectModerationLabelsCommand, 
-  DetectModerationLabelsCommandInput 
+  DetectModerationLabelsCommandInput,
+  ModerationLabel
 } from "@aws-sdk/client-rekognition";
 import { rekognitionClient } from "./aws";
 
@@ -24,6 +25,7 @@ export interface ModerationResult {
     confidence: number;
   }>;
   rejectionReason?: string;
+  fallback?: boolean;
 }
 
 /**
@@ -40,20 +42,23 @@ export async function moderateImage(imageBuffer: Buffer): Promise<ModerationResu
   };
 
   try {
+    console.log("Sending image to AWS Rekognition for moderation...");
     const command = new DetectModerationLabelsCommand(params);
     const response = await rekognitionClient.send(command);
+    
+    console.log("Received moderation response:", JSON.stringify(response));
     
     const detectedLabels = response.ModerationLabels || [];
     
     // Format the labels
-    const labels = detectedLabels.map((label) => ({
+    const labels = detectedLabels.map((label: ModerationLabel) => ({
       name: label.Name || "Unknown",
       confidence: label.Confidence || 0,
     }));
 
     // Check if any rejected categories are present
     const rejectedLabel = labels.find((label) => 
-      REJECTED_CATEGORIES.some(category => 
+      REJECTED_CATEGORIES.some((category: string) => 
         label.name.includes(category) && label.confidence >= MODERATION_CONFIDENCE_THRESHOLD
       )
     );
@@ -71,7 +76,23 @@ export async function moderateImage(imageBuffer: Buffer): Promise<ModerationResu
       labels,
     };
   } catch (error) {
-    console.error("Moderation error:", error);
-    throw new Error("Failed to moderate image");
+    console.error("AWS Rekognition moderation error:", error);
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      throw new Error(`Failed to moderate image: ${error.message}`);
+    }
+    throw new Error("Failed to moderate image due to an unknown error");
   }
+}
+
+/**
+ * Fallback moderation function for testing when AWS is not available
+ */
+export function mockModerateImage(): ModerationResult {
+  console.warn("Using mock moderation - DEVELOPMENT ONLY");
+  return {
+    approved: true,
+    labels: [],
+    fallback: true
+  };
 }

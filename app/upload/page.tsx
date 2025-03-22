@@ -1,3 +1,4 @@
+// app/upload/page.tsx
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
@@ -17,6 +18,7 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadCount, setUploadCount] = useState(0);
+  const [remainingUploads, setRemainingUploads] = useState(10);
   const maxUploads = 10; // Maximum number of photos allowed
   
   // Redirect if not signed in - moved to useEffect
@@ -25,6 +27,27 @@ export default function UploadPage() {
       router.push("/sign-in");
     }
   }, [isLoaded, isSignedIn, router]);
+
+  // Fetch the user's current photo count when the page loads
+  useEffect(() => {
+    const fetchPhotoCount = async () => {
+      if (!isSignedIn) return;
+      
+      try {
+        const response = await fetch("/api/user/photo-count");
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUploadCount(data.count);
+          setRemainingUploads(data.remainingUploads);
+        }
+      } catch (error) {
+        console.error("Failed to fetch photo count:", error);
+      }
+    };
+    
+    fetchPhotoCount();
+  }, [isSignedIn]);
 
   // Handle file drop
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -56,6 +79,12 @@ export default function UploadPage() {
   const handleUpload = async () => {
     if (!file || !user) return;
     
+    // Check if user has reached upload limit
+    if (remainingUploads <= 0) {
+      setError("You've reached the maximum number of uploads (10 photos).");
+      return;
+    }
+    
     setIsUploading(true);
     setError(null);
     
@@ -79,12 +108,13 @@ export default function UploadPage() {
       
       // Success - update count and reset form
       setUploadCount(prev => prev + 1);
+      setRemainingUploads(prev => prev - 1);
       setFile(null);
       setPreview(null);
       setDescription("");
       
-      // If user has hit the max uploads, redirect to gallery
-      if (uploadCount + 1 >= maxUploads) {
+      // If user has reached the limit, redirect to gallery
+      if (remainingUploads <= 1) {
         router.push("/gallery");
       }
     } catch (error: unknown) {
@@ -129,7 +159,7 @@ export default function UploadPage() {
       {/* Progress indicator */}
       <div className="mb-8">
         <p className="text-lg mb-2">
-          {uploadCount} of {maxUploads} photos uploaded
+          {uploadCount} of {maxUploads} photos uploaded ({remainingUploads} remaining)
         </p>
         <div className="w-full bg-gray-200 rounded-full h-2.5">
           <div 
@@ -137,10 +167,20 @@ export default function UploadPage() {
             style={{ width: `${(uploadCount / maxUploads) * 100}%` }}
           ></div>
         </div>
+        {remainingUploads <= 0 && (
+          <p className="text-red-500 mt-2">
+            You have reached the maximum number of uploads. Please delete some photos if you want to upload more.
+          </p>
+        )}
       </div>
       
       {/* Dropzone */}
-      {!preview ? (
+      {remainingUploads <= 0 ? (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700">
+          You have reached the maximum upload limit of {maxUploads} photos. 
+          Please visit your dashboard to delete some photos if you want to upload more.
+        </div>
+      ) : !preview ? (
         <div className="mb-6">
           <div
             {...getRootProps()}
