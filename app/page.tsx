@@ -28,11 +28,7 @@ export default function Home() {
       <div className="text-xl text-mono-200 text-center">
         Capture. Upload. Relive the Moments.
       </div>
-      <div className="text-sm text-mono-200 text-center">
-        Whether it’s a group hug, a candid smile, or a throwback vibe — share
-        your photos from today’s event and see them come to life on the
-        big screen. Every memory matters.
-      </div>
+      
       <div className="flex flex-col gap-4 w-full">
         {!isSignedIn && (
           <SignedOut>
@@ -61,6 +57,11 @@ export default function Home() {
             />
           </Link>
         )}
+      </div>
+      <div className="text-sm text-mono-200 text-center">
+        Whether it’s a group hug, a candid smile, or a throwback vibe — share
+        your photos from today’s event and see them come to life on the
+        big screen. Every memory matters.
       </div>
     </div>
   );
