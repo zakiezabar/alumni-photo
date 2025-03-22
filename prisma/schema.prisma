@@ -1,0 +1,37 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  clerkId   String   @unique
+  email     String?
+  username  String?
+  firstName String?
+  lastName  String?
+  photo     String?
+  createdAt DateTime? // Made optional with ? to handle null values
+  updatedAt DateTime? // Made optional with ? to handle null values
+  photos    Photo[]
+
+  @@map("users") // Make sure this matches your collection name in clerk-db
+}
+
+model Photo {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  s3Key       String   @unique
+  s3Url       String
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime? @default(now()) // Made optional with ? to handle null values
+  description String?
+  moderation  Json?    // Store moderation results if needed
+  
+  @@map("photos")
+}

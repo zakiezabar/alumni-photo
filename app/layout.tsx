@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Space_Mono } from "next/font/google";
 import "./globals.css";
 import { ClerkLoaded, ClerkLoading, ClerkProvider } from "@clerk/nextjs";
-import Navbar from "@/components/Navbar";
+// import Navbar from "@/components/Navbar";
+import Navigation from "@/components/Navigation";
 
 const spaceMono = Space_Mono({
   subsets: ['latin'],
@@ -29,14 +30,14 @@ export default function RootLayout({
           className={spaceMono.className}
         >
           <ClerkLoading>
-            <Navbar />
-            <div className="h-screen flex flex-col items-center text-sm justify-center font-mono p-4 bg-slate-100">
+            <Navigation />
+            <div className="min-h-screen py-6">
               Loading...
             </div>            
           </ClerkLoading>
           <ClerkLoaded>
-            <Navbar />  
-            <div className="h-screen flex flex-col items-center justify-center">
+            <Navigation />  
+            <div className="min-h-screen py-6">
               {children}
             </div>
           </ClerkLoaded>
