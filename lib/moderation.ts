@@ -6,7 +6,7 @@ import {
 import { rekognitionClient } from "./aws";
 
 // Configure moderation sensitivity
-const MODERATION_CONFIDENCE_THRESHOLD = 70; // 0-100, higher is more strict
+const MODERATION_CONFIDENCE_THRESHOLD = 90; // 0-100, higher is more strict
 
 // List of categories that should be rejected
 const REJECTED_CATEGORIES = [
@@ -16,6 +16,14 @@ const REJECTED_CATEGORIES = [
   "Hate Symbols",
   "Drugs & Tobacco",
   "Alcohol",
+  "Rude Gestures",
+  "Gambling",
+  "Weapons",
+  "Swimwear or Underwear",
+  "Graphic Violence or Gore",
+  "Political Symbols",
+  "Offensive Text or Gestures",
+  "Lewd or Suggestive Content"
 ];
 
 export interface ModerationResult {

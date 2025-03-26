@@ -1,26 +1,41 @@
-// app/upload/page.tsx
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
 import Image from "next/image";
-import { Camera, X } from "lucide-react";
+import { Camera, X, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+
+type FileWithPreview = {
+  file: File;
+  preview: string;
+  id: string;
+  status: "pending" | "uploading" | "success" | "error";
+  description: string;
+  errorMessage?: string;
+};
 
 export default function UploadPage() {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
 
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [description, setDescription] = useState("");
+  const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadCount, setUploadCount] = useState(0);
   const [remainingUploads, setRemainingUploads] = useState(10);
   const maxUploads = 10; // Maximum number of photos allowed
+
+  // const [file, setFile] = useState<FileWithPreview[]>([]);
+  // const [preview, setPreview] = useState<string | null>(null);
+  // const [description, setDescription] = useState("");
+  // const [isUploading, setIsUploading] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
+  // const [uploadCount, setUploadCount] = useState(0);
+  // const [remainingUploads, setRemainingUploads] = useState(10);
+  // const maxUploads = 10; // Maximum number of photos allowed
 
   // Redirect if not signed in - moved to useEffect
   useEffect(() => {
@@ -28,6 +43,13 @@ export default function UploadPage() {
       router.push("/sign-in");
     }
   }, [isLoaded, isSignedIn, router]);
+
+  // Clean up object URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      files.forEach((fileObj) => URL.revokeObjectURL(fileObj.preview));
+    };
+  }, [files]);
 
   // Fetch the user's current photo count when the page loads
   useEffect(() => {
@@ -51,34 +73,57 @@ export default function UploadPage() {
   }, [isSignedIn]);
 
   // Handle file drop
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const selectedFile = acceptedFiles[0];
-    if (selectedFile) {
-      setFile(selectedFile);
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      // Limit number of files to remaining uploads
+      const filesToAdd = acceptedFiles.slice(0, remainingUploads);
 
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
+      if (filesToAdd.length === 0) return;
 
+      const newFiles = filesToAdd.map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+        id: Math.random().toString(36).substring(2, 9),
+        status: "pending" as const,
+        description: "",
+      }));
+
+      setFiles((prevFiles) => [...prevFiles, ...newFiles]);
       setError(null);
-    }
-  }, []);
+    },
+    [remainingUploads]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
+      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".heic"],
     },
-    maxFiles: 1,
-    multiple: false,
+    maxFiles: remainingUploads,
+    multiple: true, // Allow multiple files
   });
 
-  // Handle upload
-  const handleUpload = async () => {
-    if (!file || !user) return;
+  // Handle description change for a specific file
+  const handleDescriptionChange = (id: string, description: string) => {
+    setFiles(
+      files.map((file) => (file.id === id ? { ...file, description } : file))
+    );
+  };
+
+  // Remove a file from the list
+  const handleRemoveFile = (id: string) => {
+    setFiles((prevFiles) => {
+      const fileToRemove = prevFiles.find((f) => f.id === id);
+      if (fileToRemove) {
+        URL.revokeObjectURL(fileToRemove.preview);
+      }
+      return prevFiles.filter((f) => f.id !== id);
+    });
+  };
+
+  // Handle upload of all files
+  const handleUploadAll = async () => {
+    if (files.length === 0 || !user) return;
 
     // Check if user has reached upload limit
     if (remainingUploads <= 0) {
@@ -86,44 +131,93 @@ export default function UploadPage() {
       return;
     }
 
+    // Check if there are enough remaining uploads
+    if (files.length > remainingUploads) {
+      setError(`You can only upload ${remainingUploads} more photos.`);
+      return;
+    }
+
     setIsUploading(true);
     setError(null);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      if (description) {
-        formData.append("description", description);
+    // Mark all files as uploading
+    setFiles((prevFiles) =>
+      prevFiles.map((file) => ({ ...file, status: "uploading" }))
+    );
+
+    // Upload each file sequentially
+    let successCount = 0;
+
+    for (const fileObj of files) {
+      // Skip already uploaded files
+      if (fileObj.status === "success") {
+        continue;
       }
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      try {
+        const formData = new FormData();
+        formData.append("file", fileObj.file);
 
-      const result = await response.json();
+        if (fileObj.description) {
+          formData.append("description", fileObj.description);
+        }
 
-      if (!response.ok) {
-        throw new Error(result.reason || result.error || "Upload failed");
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          // Mark this specific file as failed
+          setFiles((prevFiles) =>
+            prevFiles.map((f) =>
+              f.id === fileObj.id
+                ? {
+                    ...f,
+                    status: "error",
+                    errorMessage:
+                      result.reason || result.error || "Upload failed",
+                  }
+                : f
+            )
+          );
+        } else {
+          // Mark this file as successful
+          setFiles((prevFiles) =>
+            prevFiles.map((f) =>
+              f.id === fileObj.id ? { ...f, status: "success" } : f
+            )
+          );
+          successCount++;
+        }
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to upload image";
+
+        // Mark this file as failed
+        setFiles((prevFiles) =>
+          prevFiles.map((f) =>
+            f.id === fileObj.id ? { ...f, status: "error", errorMessage } : f
+          )
+        );
       }
+    }
 
-      // Success - update count and reset form
-      setUploadCount((prev) => prev + 1);
-      setRemainingUploads((prev) => prev - 1);
-      setFile(null);
-      setPreview(null);
-      setDescription("");
+    // Update counts based on successful uploads
+    if (successCount > 0) {
+      setUploadCount((prev) => prev + successCount);
+      setRemainingUploads((prev) => prev - successCount);
+    }
 
-      // If user has reached the limit, redirect to gallery
-      if (remainingUploads <= 1) {
+    setIsUploading(false);
+
+    // If all uploads are done and there are no more remaining uploads, redirect to gallery
+    if (successCount > 0 && remainingUploads - successCount <= 0) {
+      setTimeout(() => {
         router.push("/gallery");
-      }
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to upload image";
-      setError(errorMessage);
-    } finally {
-      setIsUploading(false);
+      }, 2000);
     }
   };
 
@@ -154,6 +248,10 @@ export default function UploadPage() {
     return null;
   }
 
+  const pendingFiles = files.filter(
+    (f) => f.status === "pending" || f.status === "uploading"
+  );
+
   return (
     <div className="max-w-2xl mx-auto p-4 justify-center">
       <h1 className="text-2xl font-bold mb-6 text-center text-primary-400">
@@ -165,24 +263,19 @@ export default function UploadPage() {
             {[
               {
                 number: "01",
-                description:
-                  "Choose your favorite photo from the event.",
+                description: "Choose your favorite photos from the event.",
               },
               {
                 number: "02",
-                description:
-                  "Make sure it’s clear and appropriate.",
+                description: "Make sure they're clear and appropriate.",
               },
               {
                 number: "03",
                 description:
-                  "Hit “Upload” and your memory will light up the big screen!",
+                  "Hit Upload and your memories will light up the big screen!",
               },
             ].map((step) => (
-              <div
-                key={step.number}
-                className="flex items-center space-x-4"
-              >
+              <div key={step.number} className="flex items-center space-x-4">
                 {/* Fixed-size circular number indicator */}
                 <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-primary-400 text-secondary-800">
                   <span className="text-sm font-bold">
@@ -229,111 +322,142 @@ export default function UploadPage() {
           Please visit your dashboard to delete some photos if you want to
           upload more.
         </div>
-      ) : !preview ? (
-        <div className="mb-6">
-          <div
-            {...getRootProps()}
-            className={`border-1 border-dashed rounded-lg p-8 text-center cursor-pointer transition bg-secondary-600/50 ${
-              isDragActive ? "border-blue-500 bg-blue-50" : "border-mono-300"
-            }`}
-          >
-            <input {...getInputProps()} />
-            <p className="text-lg mb-2 text-mono-200">
-              Drag & drop an image here, or click to select
-            </p>
-            <p className="text-sm text-mono-400 mb-4">
-              Supported formats: JPG, PNG, GIF
-            </p>
-          </div>
-
-          {/* Camera capture button */}
-          <div className="mt-4">
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={handleCameraCapture}
-              className="w-full"
-            >
-              <Camera className="mr-2" size={20} />
-              Take a Photo
-            </Button>
-          </div>
-          {/* <button
-            type="button"
-            onClick={handleCameraCapture}
-            className="mt-4 flex items-center justify-center w-full py-2 bg-mono-100 rounded-md hover:bg-mono-200"
-          >
-            <Camera className="mr-2" size={20} />
-            Take a Photo
-          </button> */}
-        </div>
       ) : (
-        /* Image preview */
-        <div className="mb-6">
-          <div className="relative aspect-video w-full mb-4 bg-mono-100 rounded-lg overflow-hidden">
-            <Image
-              src={preview}
-              alt="Preview"
-              fill
-              className="object-cover"
-            />
-            <div className="absolute bottom-2 left-2 flex space-x-2">
+        <>
+          {/* File drop area */}
+          <div className="mb-6">
+            <div
+              {...getRootProps()}
+              className={`border-1 border-dashed rounded-lg p-8 text-center cursor-pointer transition bg-secondary-600/50 ${
+                isDragActive ? "border-blue-500 bg-blue-50" : "border-mono-300"
+              }`}
+            >
+              <input {...getInputProps()} />
+              <p className="text-lg mb-2 text-mono-200">
+                Drag & drop up to {remainingUploads} images here, or click to
+                select
+              </p>
+              <p className="text-sm text-mono-400 mb-4">
+                Supported formats: JPG, PNG, GIF
+              </p>
+            </div>
+
+            {/* Camera capture button */}
+            <div className="mt-4">
               <Button
-                variant="destructive"
-                onClick={() => {
-                  setFile(null);
-                  setPreview(null);
-                }}
-                className="text-mono-100"
+                variant="primary"
+                size="lg"
+                onClick={handleCameraCapture}
+                className="w-full"
               >
-                <X /> Cancel
+                <Camera className="mr-2" size={20} />
+                Take a Photo
               </Button>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Description field */}
-      {preview && (
-        <div className="mb-6">
-          <label
-            htmlFor="description"
-            className="block mb-2 text-sm font-medium text-mono-400"
-          >
-            Description (optional)
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full p-2 border border-mono-300 rounded-md text-mono-100 bg-secondary-600/50"
-            rows={2}
-            placeholder="Add a description..."
-          ></textarea>
-        </div>
-      )}
+          {/* Files Preview and Upload Section */}
+          {files.length > 0 && (
+            <div className="space-y-6 mb-8">
+              <h3 className="text-lg font-semibold text-primary-400">
+                Selected Photos ({files.length})
+              </h3>
 
-      {/* Error message */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
-          {error}
-        </div>
-      )}
+              {/* Photo thumbnails grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {files.map((fileObj) => (
+                  <div
+                    key={fileObj.id}
+                    className="relative border rounded-lg overflow-hidden bg-mono-800"
+                  >
+                    {/* Status indicator */}
+                    <div className="absolute top-2 right-2 z-10">
+                      {fileObj.status === "success" && (
+                        <CheckCircle className="h-6 w-6 text-green-500" />
+                      )}
+                      {fileObj.status === "error" && (
+                        <XCircle className="h-6 w-6 text-red-500" />
+                      )}
+                      {fileObj.status === "uploading" && (
+                        <Clock className="h-6 w-6 text-yellow-500 animate-pulse" />
+                      )}
+                    </div>
 
-      {/* Upload button */}
-      {preview && (
-        <Button
-          variant="primary"
-          onClick={handleUpload}
-          disabled={isUploading || !file}
-          className={`w-full py-6 rounded-md text-secondary-600 ${
-            isUploading
-              ? "bg-secondary-400 cursor-not-allowed text-primary-400 transition duration-700 ease-in-out"
-              : "bg-primary-400 hover:bg-primary-600"
-          }`}
-        >
-          {isUploading ? "Validating..." : "Validate & Upload"}
-        </Button>
+                    {/* Remove button */}
+                    <button
+                      onClick={() => handleRemoveFile(fileObj.id)}
+                      className="absolute top-2 left-2 z-10 bg-black bg-opacity-60 text-white rounded-full p-1 hover:bg-opacity-80"
+                      type="button"
+                    >
+                      <X size={16} />
+                    </button>
+
+                    {/* Image */}
+                    <div className="relative aspect-square w-full">
+                      <Image
+                        src={fileObj.preview}
+                        alt="Preview"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+
+                    {/* Error message if any */}
+                    {fileObj.status === "error" && fileObj.errorMessage && (
+                      <div className="p-2 text-xs text-red-500 bg-red-50 border-t border-red-200">
+                        {fileObj.errorMessage}
+                      </div>
+                    )}
+
+                    {/* Description field (if not yet uploaded) */}
+                    {(fileObj.status === "pending" ||
+                      fileObj.status === "uploading") && (
+                      <div className="p-2">
+                        <input
+                          type="text"
+                          value={fileObj.description}
+                          onChange={(e) =>
+                            handleDescriptionChange(fileObj.id, e.target.value)
+                          }
+                          placeholder="Add description..."
+                          className="w-full text-xs p-1 bg-secondary-600/50 border border-mono-300 rounded"
+                          disabled={fileObj.status === "uploading"}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Upload button for multiple files */}
+              {pendingFiles.length > 0 && (
+                <Button
+                  variant="primary"
+                  onClick={handleUploadAll}
+                  disabled={isUploading || pendingFiles.length === 0}
+                  className={`w-full py-6 rounded-md text-secondary-600 ${
+                    isUploading
+                      ? "bg-secondary-400 cursor-not-allowed text-primary-400 transition duration-700 ease-in-out"
+                      : "bg-primary-400 hover:bg-primary-600"
+                  }`}
+                >
+                  {isUploading
+                    ? "Uploading..."
+                    : `Upload ${pendingFiles.length} Photo${
+                        pendingFiles.length !== 1 ? "s" : ""
+                      }`}
+                </Button>
+              )}
+
+              {/* Error message */}
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-700 mt-4">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* Gallery link */}
