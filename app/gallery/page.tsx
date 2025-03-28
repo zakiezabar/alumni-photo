@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback} from "react";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
@@ -58,7 +58,56 @@ export default function GalleryPage() {
   // Slideshow state
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [slideshowPlaying, setSlideshowPlaying] = useState(false);
-  // const [slideshowInterval, setSlideshowInterval] = useState<NodeJS.Timeout | null>(null);
+
+  // Define functions with useCallback to prevent dependency issues
+  const closeLightbox = useCallback(() => {
+    setLightboxOpen(false);
+    setIsFullScreen(false);
+    if (viewMode === "slideshow") {
+      setViewMode("grid");
+    }
+  }, [viewMode]);
+
+  const toggleSlideshow = useCallback(() => {
+    setSlideshowPlaying((prev) => !prev);
+  }, []);
+
+  const toggleFullScreen = useCallback(() => {
+    setIsFullScreen((prev) => !prev);
+  }, []);
+
+  const navigateLightbox = useCallback(
+    (direction: "prev" | "next") => {
+      // Reset zoom immediately
+      setZoomActive(false);
+      
+      let newIndex;
+      if (direction === "prev") {
+        newIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
+        setSlideTransition("outgoing"); // Right to left for previous
+      } else {
+        newIndex = (currentPhotoIndex + 1) % photos.length;
+        setSlideTransition("incoming"); // Left to right for next
+      }
+
+      // Apply transition
+      setTimeout(() => {
+        setCurrentPhotoIndex(newIndex);
+        setSlideTransition("active");
+
+        // Reset transition state after animation completes
+        setTimeout(() => {
+          setSlideTransition("none");
+          
+          // Start zoom effect after slide transition is complete
+          setTimeout(() => {
+            setZoomActive(true);
+          }, 100);
+        }, 500);
+      }, 50);
+    },
+    [currentPhotoIndex, photos.length]
+  );
 
   const fetchGallery = async (page = 1) => {
     setIsLoading(true);
@@ -80,40 +129,6 @@ export default function GalleryPage() {
       setIsLoading(false);
     }
   };
-
-  // Define navigation functions using useCallback
-  const navigateLightbox = useCallback(
-    (direction: "prev" | "next") => {
-      let newIndex;
-      if (direction === "prev") {
-        newIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
-        setSlideTransition("outgoing"); // Right to left for previous
-      } else {
-        newIndex = (currentPhotoIndex + 1) % photos.length;
-        setSlideTransition("incoming"); // Left to right for next
-      }
-
-      // Apply transition
-      setTimeout(() => {
-        setCurrentPhotoIndex(newIndex);
-        setSlideTransition("active");
-
-        // Reset transition state after animation completes
-        setTimeout(() => {
-          setSlideTransition("none");
-        }, 500);
-      }, 50);
-    },
-    [currentPhotoIndex, photos.length]
-  );
-
-  const closeLightbox = useCallback(() => {
-    setLightboxOpen(false);
-    setIsFullScreen(false);
-    if (viewMode === "slideshow") {
-      setViewMode("grid");
-    }
-  }, [viewMode]);
 
   useEffect(() => {
     fetchGallery(1);
@@ -139,7 +154,14 @@ export default function GalleryPage() {
           }
           break;
         case "f":
+        case "F":
           toggleFullScreen();
+          break;
+        case " ": // Spacebar
+          if (viewMode === "slideshow") {
+            toggleSlideshow();
+            e.preventDefault(); // Prevent page scrolling
+          }
           break;
       }
     };
@@ -148,11 +170,12 @@ export default function GalleryPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     lightboxOpen,
-    currentPhotoIndex,
-    photos.length,
-    isFullScreen,
     navigateLightbox,
+    isFullScreen,
     closeLightbox,
+    toggleFullScreen,
+    viewMode,
+    toggleSlideshow
   ]);
 
   // Reset zoom animation when photo changes
@@ -162,7 +185,6 @@ export default function GalleryPage() {
 
     const timer = setTimeout(() => {
       setZoomActive(true);
-      console.log('Zoom activated');
     }, 500); // Start after slide transition completes
 
     // Cleanup
@@ -208,38 +230,54 @@ export default function GalleryPage() {
     setLightboxOpen(true);
   };
 
+  // Modified to enable fullscreen immediately
   const toggleViewMode = () => {
     if (viewMode === "grid") {
+      // Switch to slideshow
       setViewMode("slideshow");
+      
+      // Open lightbox if not already open
       if (!lightboxOpen && photos.length > 0) {
         setLightboxOpen(true);
+        
+        // Automatically start playing the slideshow
+        setSlideshowPlaying(true);
+        
+        // Automatically enable fullscreen mode
+        setIsFullScreen(true);
+      } else if (lightboxOpen) {
+        // If lightbox is already open, just enable fullscreen
+        setIsFullScreen(true);
       }
     } else {
+      // Switch back to grid view
       setViewMode("grid");
+      setSlideshowPlaying(false);
+      setIsFullScreen(false);
     }
-  };
-
-  const toggleSlideshow = () => {
-    setSlideshowPlaying((prev) => !prev);
-  };
-
-  const toggleFullScreen = () => {
-    setIsFullScreen((prev) => !prev);
   };
 
   const selectThumbnail = (index: number) => {
     if (index === currentPhotoIndex) return;
-
+    
+    // Reset zoom immediately
+    setZoomActive(false);
+    
     setSlideTransition(index > currentPhotoIndex ? "incoming" : "outgoing");
-
+    
     // Apply transition
     setTimeout(() => {
       setCurrentPhotoIndex(index);
       setSlideTransition("active");
-
+      
       // Reset transition state after animation completes
       setTimeout(() => {
         setSlideTransition("none");
+        
+        // Start zoom effect after slide transition is complete
+        setTimeout(() => {
+          setZoomActive(true);
+        }, 100);
       }, 500);
     }, 50);
   };
@@ -262,7 +300,7 @@ export default function GalleryPage() {
               {viewMode === "grid" ? (
                 <>
                   <SlidersHorizontal className="mr-2 h-4 w-4" />
-                  Slideshow
+                  Fullscreen Slideshow
                 </>
               ) : (
                 <>
@@ -435,9 +473,10 @@ export default function GalleryPage() {
                 >
                   <div className="relative max-w-full max-h-full overflow-hidden">
                     <div
+                      key={photos[currentPhotoIndex].id}
                       style={{
                         transition: "transform 30s linear",
-                        transform: zoomActive ? "scale(3)" : "scale(1)",
+                        transform: zoomActive ? "scale(1.4)" : "scale(1)",
                         transformOrigin: "center center",
                       }}
                     >
@@ -494,6 +533,13 @@ export default function GalleryPage() {
                     </Button>
                   </div>
                 )}
+
+                {/* Photo counter overlay in fullscreen mode */}
+                {isFullScreen && (
+                  <div className="absolute top-4 left-4 text-white bg-black bg-opacity-50 px-3 py-1 rounded-full">
+                    {currentPhotoIndex + 1} / {photos.length}
+                  </div>
+                )}
               </div>
 
               {/* Thumbnails bar */}
@@ -524,15 +570,9 @@ export default function GalleryPage() {
                 </div>
               )}
 
-              {/* Photo info - hide in fullscreen */}
-              {!isFullScreen && (
-                <div className="bg-black bg-opacity-50 p-4 text-white">
-                  {photos[currentPhotoIndex].description && (
-                    <p className="mb-2">
-                      {photos[currentPhotoIndex].description}
-                    </p>
-                  )}
-
+              {/* Photo info - show in all modes with different styling */}
+              <div className={`bg-black ${isFullScreen ? 'bg-opacity-25 absolute bottom-0 left-0 w-full' : 'bg-opacity-50'} p-4 text-white`}>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     {photos[currentPhotoIndex].user.avatar ? (
                       <Image
@@ -545,15 +585,22 @@ export default function GalleryPage() {
                     ) : (
                       <div className="w-6 h-6 bg-gray-600 rounded-full mr-2"></div>
                     )}
-                    <span className="text-sm">
-                      {photos[currentPhotoIndex].user.name || "Anonymous"} •{" "}
-                      {new Date(
-                        photos[currentPhotoIndex].createdAt
-                      ).toLocaleString()}
-                    </span>
+                    <div>
+                      <span className="text-sm font-semibold">
+                        {photos[currentPhotoIndex].user.name || "Anonymous"}
+                      </span>
+                      {photos[currentPhotoIndex].description && (
+                        <p className="text-sm opacity-90 mt-1">
+                          {photos[currentPhotoIndex].description}
+                        </p>
+                      )}
+                    </div>
                   </div>
+                  <span className="text-xs opacity-75">
+                    {new Date(photos[currentPhotoIndex].createdAt).toLocaleString()}
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
