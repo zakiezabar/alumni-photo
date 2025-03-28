@@ -12,7 +12,7 @@ import {
   Play,
   Pause,
   Grid,
-  SlidersHorizontal,
+  MonitorPlay,
   Expand,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -284,12 +284,12 @@ export default function GalleryPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col lg:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-2xl font-bold text-mono-100">
           Event Photo Gallery
         </h1>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center lg:space-x-2">
           {/* View mode toggle */}
           {photos.length > 0 && (
             <Button
@@ -299,7 +299,7 @@ export default function GalleryPage() {
             >
               {viewMode === "grid" ? (
                 <>
-                  <SlidersHorizontal className="mr-2 h-4 w-4" />
+                  <MonitorPlay className="mr-2 h-4 w-4" />
                   Fullscreen Slideshow
                 </>
               ) : (
