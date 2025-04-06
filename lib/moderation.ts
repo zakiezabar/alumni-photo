@@ -75,7 +75,7 @@ export async function moderateImage(imageBuffer: Buffer): Promise<ModerationResu
       return {
         approved: false,
         labels,
-        rejectionReason: `Image contains inappropriate content (${rejectedLabel.name})`,
+        rejectionReason: `Image contains inappropriate content. (${rejectedLabel.name})`,
       };
     }
 

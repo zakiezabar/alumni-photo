@@ -368,7 +368,7 @@ export default function UploadPage() {
                 {files.map((fileObj) => (
                   <div
                     key={fileObj.id}
-                    className="relative border rounded-lg overflow-hidden bg-mono-800"
+                    className="relative border rounded-lg overflow-hidden bg-mono-200"
                   >
                     {/* Status indicator */}
                     <div className="absolute top-2 right-2 z-10">
@@ -412,7 +412,7 @@ export default function UploadPage() {
                     {/* Description field (if not yet uploaded) */}
                     {(fileObj.status === "pending" ||
                       fileObj.status === "uploading") && (
-                      <div className="p-2">
+                      <div className="p-1">
                         <input
                           type="text"
                           value={fileObj.description}
@@ -420,7 +420,7 @@ export default function UploadPage() {
                             handleDescriptionChange(fileObj.id, e.target.value)
                           }
                           placeholder="Add description..."
-                          className="w-full text-xs p-1 bg-secondary-600/50 border border-mono-300 rounded"
+                          className="w-full text-xs p-2 bg-mono-100 border border-mono-300 rounded-md"
                           disabled={fileObj.status === "uploading"}
                         />
                       </div>
