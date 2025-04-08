@@ -6,6 +6,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
 import { Menu, X } from "lucide-react";
+import { Space_Mono } from "next/font/google";
+
+const spaceMono = Space_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -25,14 +32,14 @@ export default function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="text-xl font-bold text-secondary-400">
+              <Link href="/" className={`${spaceMono.className} text-xl font-bold text-secondary-400`}>
                 Share moments!
               </Link>
             </div>
           </div>
 
           {/* Desktop navigation */}
-          <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+          <div className={`${spaceMono.className} hidden sm:ml-6 sm:flex sm:space-x-8`}>
             {navigation.map((item) => {
               // Don't show Upload and My Photos if not signed in
               if (!isSignedIn && (item.href === "/upload" || item.href === "/dashboard")) {

@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import { moderateImage, mockModerateImage } from "@/lib/moderation";
 import { uploadImageToS3 } from "@/lib/s3-upload";
+import { broadcastGalleryUpdate } from "@/lib/broadcastUpdate";
 
 export async function POST(request: NextRequest) {
   try {
@@ -136,6 +137,13 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Broadcast update about the new photo
+      await broadcastGalleryUpdate({
+        type: "new-photo",
+        photoId: photo.id,
+        timestamp: new Date().toISOString()
+      });
+
       return NextResponse.json({
         success: true,
         photo: {
@@ -154,6 +162,7 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
   } catch (error: unknown) {
     console.error("Upload error:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

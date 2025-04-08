@@ -42,6 +42,23 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "12");
+    const countOnly = searchParams.get("count") === "true";
+
+    // Get total count for pagination
+    const totalPhotos = await prisma.photo.count();
+    
+    // If count-only is requested, return just the count
+    if (countOnly) {
+      return NextResponse.json({
+        pagination: {
+          total: totalPhotos,
+          pages: Math.ceil(totalPhotos / limit),
+          currentPage: page,
+          limit,
+        }
+      });
+    }
+
     const skip = (page - 1) * limit;
 
     // Fetch photos with pagination
@@ -76,7 +93,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // Get total count for pagination
-    const totalPhotos = await prisma.photo.count();
+    // const totalPhotos = await prisma.photo.count();
 
     return NextResponse.json({
       photos: formattedPhotos,

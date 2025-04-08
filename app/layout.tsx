@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Mono } from "next/font/google";
+import { Nunito_Sans } from "next/font/google";
 import "./globals.css";
 import { ClerkLoaded, ClerkLoading, ClerkProvider } from "@clerk/nextjs";
 // import Navbar from "@/components/Navbar";
@@ -8,11 +8,13 @@ import { Camera } from "lucide-react";
 import { HyperText } from "@/components/magicui/hyper-text";
 import { ToastProvider } from "@/components/ui/use-toast";
 
-const spaceMono = Space_Mono({
-  subsets: ["latin"],
-  weight: ["400", "700"], // Specify weights if needed
-  variable: "--font-space-mono", // Optional CSS variable for custom use
-});
+// const spaceMono = Space_Mono({
+//   subsets: ["latin"],
+//   weight: ["400", "700"], // Specify weights if needed
+//   variable: "--font-space-mono", // Optional CSS variable for custom use
+// });
+
+const font = Nunito_Sans({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Share moments",
@@ -27,7 +29,7 @@ export default function RootLayout({
   return (
     <ClerkProvider afterSignOutUrl={"/"}>
       <html lang="en">
-        <body className={spaceMono.className}>
+        <body className={font.className}>
           <ClerkLoading>
             <div className="h-screen flex flex-row gap-4 items-center text-sm justify-center font-mono p-4 bg-primary-400">
               <Camera className="w-12 h-12 animate-spin" />

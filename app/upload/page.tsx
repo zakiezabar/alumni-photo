@@ -26,6 +26,7 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadCount, setUploadCount] = useState(0);
   const [remainingUploads, setRemainingUploads] = useState(10);
+  const [totalGalleryCount, setTotalGalleryCount] = useState(0);
   const maxUploads = 10; // Maximum number of photos allowed
 
   // const [file, setFile] = useState<FileWithPreview[]>([]);
@@ -71,6 +72,23 @@ export default function UploadPage() {
 
     fetchPhotoCount();
   }, [isSignedIn]);
+
+  // New effect to fetch total gallery count
+  useEffect(() => {
+    const fetchTotalGalleryCount = async () => {
+      try {
+        const response = await fetch("/api/gallery?count=true");
+        if (response.ok) {
+          const data = await response.json();
+          setTotalGalleryCount(data.pagination?.total || 0);
+        }
+      } catch (error) {
+        console.error("Error fetching gallery count:", error);
+      }
+    };
+    
+    fetchTotalGalleryCount();
+  }, []);
 
   // Handle file drop
   const onDrop = useCallback(
@@ -460,15 +478,28 @@ export default function UploadPage() {
         </>
       )}
 
-      {/* Gallery link */}
-      {uploadCount > 0 && (
+      {/* Gallery link with total count */}
+      {totalGalleryCount > 0 && (
         <div className="mt-4 text-center">
           <Button
             variant="ghost"
             onClick={() => router.push("/gallery")}
             className="text-secondary-200 hover:underline hover:bg-transparent hover:text-secondary-300 py-6 w-full"
           >
-            View the gallery ({uploadCount} photos)
+            View the gallery ({totalGalleryCount} photos)
+          </Button>
+        </div>
+      )}
+      
+      {/* Fallback to show something if we have user uploads but total count failed to load */}
+      {totalGalleryCount === 0 && uploadCount > 0 && (
+        <div className="mt-4 text-center">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/gallery")}
+            className="text-secondary-200 hover:underline hover:bg-transparent hover:text-secondary-300 py-6 w-full"
+          >
+            View the gallery
           </Button>
         </div>
       )}

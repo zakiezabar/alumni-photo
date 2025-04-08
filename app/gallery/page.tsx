@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import {
-  Camera,
   X,
   ChevronLeft,
   ChevronRight,
@@ -15,13 +14,19 @@ import {
   MonitorPlay,
   Expand,
   Download,
-  CheckCircle,
+  CircleCheck,
   Circle,
   Trash2,
-  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { Space_Mono } from "next/font/google";
+
+const spaceMono = Space_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
 interface Photo {
   id: string;
@@ -42,7 +47,7 @@ interface PaginationData {
   limit: number;
 }
 
-type ViewMode = "grid" | "slideshow" | "selection" | "deletion";
+type ViewMode = "grid" | "slideshow" | "selection";
 type SlideTransition = "none" | "incoming" | "active" | "outgoing";
 
 export default function GalleryPage() {
@@ -78,27 +83,34 @@ export default function GalleryPage() {
   // Fetch user role
   const fetchUserRole = useCallback(async () => {
     if (!isSignedIn || !user) return;
-    
+
     console.log("Fetching user role for", user.id);
-    
+
     try {
-      const response = await fetch('/api/user/role');
+      const response = await fetch("/api/user/role");
       console.log("Role API response status:", response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log("Role data received:", data);
-        
+
         setUserRole(data.role);
         setCurrentUserId(data.userId);
-        
-        console.log("Updated state - userRole:", data.role, "currentUserId:", data.userId);
+
+        console.log(
+          "Updated state - userRole:",
+          data.role,
+          "currentUserId:",
+          data.userId
+        );
       } else {
-        const errorData = await response.json().catch(() => ({ error: "Could not parse error response" }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Could not parse error response" }));
         console.error("Error response from role API:", errorData);
       }
     } catch (error) {
-      console.error('Error fetching user role:', error);
+      console.error("Error fetching user role:", error);
     }
   }, [isSignedIn, user]);
 
@@ -129,7 +141,7 @@ export default function GalleryPage() {
     (direction: "prev" | "next") => {
       // Reset zoom immediately
       setZoomActive(false);
-      
+
       let newIndex;
       if (direction === "prev") {
         newIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
@@ -147,7 +159,7 @@ export default function GalleryPage() {
         // Reset transition state after animation completes
         setTimeout(() => {
           setSlideTransition("none");
-          
+
           // Start zoom effect after slide transition is complete
           setTimeout(() => {
             setZoomActive(true);
@@ -158,7 +170,7 @@ export default function GalleryPage() {
     [currentPhotoIndex, photos.length]
   );
 
-  const fetchGallery = async (page = 1) => {
+  const fetchGallery = useCallback(async (page = 1) => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/gallery?page=${page}&limit=12`);
@@ -177,11 +189,11 @@ export default function GalleryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchGallery(1);
-  }, []);
+  }, [fetchGallery]);
 
   // Keyboard navigation for lightbox
   useEffect(() => {
@@ -224,7 +236,7 @@ export default function GalleryPage() {
     closeLightbox,
     toggleFullScreen,
     viewMode,
-    toggleSlideshow
+    toggleSlideshow,
   ]);
 
   // Reset zoom animation when photo changes
@@ -276,8 +288,8 @@ export default function GalleryPage() {
   };
 
   const openLightbox = (index: number) => {
-    if (viewMode === "selection" || viewMode === "deletion") return; // Don't open lightbox in selection or deletion mode
-    
+    if (viewMode === "selection") return; // Don't open lightbox in selection or deletion mode
+
     setCurrentPhotoIndex(index);
     setSlideTransition("none");
     setLightboxOpen(true);
@@ -288,14 +300,14 @@ export default function GalleryPage() {
     if (viewMode === "grid") {
       // Switch to slideshow
       setViewMode("slideshow");
-      
+
       // Open lightbox if not already open
       if (!lightboxOpen && photos.length > 0) {
         setLightboxOpen(true);
-        
+
         // Automatically start playing the slideshow
         setSlideshowPlaying(true);
-        
+
         // Automatically enable fullscreen mode
         setIsFullScreen(true);
       } else if (lightboxOpen) {
@@ -312,21 +324,21 @@ export default function GalleryPage() {
 
   const selectThumbnail = (index: number) => {
     if (index === currentPhotoIndex) return;
-    
+
     // Reset zoom immediately
     setZoomActive(false);
-    
+
     setSlideTransition(index > currentPhotoIndex ? "incoming" : "outgoing");
-    
+
     // Apply transition
     setTimeout(() => {
       setCurrentPhotoIndex(index);
       setSlideTransition("active");
-      
+
       // Reset transition state after animation completes
       setTimeout(() => {
         setSlideTransition("none");
-        
+
         // Start zoom effect after slide transition is complete
         setTimeout(() => {
           setZoomActive(true);
@@ -349,18 +361,18 @@ export default function GalleryPage() {
     }
   };
 
-  const toggleDeletionMode = () => {
-    if (viewMode === "deletion") {
-      setViewMode("grid");
-      setSelectedPhotos(new Set());
-    } else {
-      setViewMode("deletion");
-      // Close lightbox if open
-      if (lightboxOpen) {
-        closeLightbox();
-      }
-    }
-  };
+  // const toggleDeletionMode = () => {
+  //   if (viewMode === "deletion") {
+  //     setViewMode("grid");
+  //     setSelectedPhotos(new Set());
+  //   } else {
+  //     setViewMode("deletion");
+  //     // Close lightbox if open
+  //     if (lightboxOpen) {
+  //       closeLightbox();
+  //     }
+  //   }
+  // };
 
   const togglePhotoSelection = (id: string) => {
     setSelectedPhotos((prev) => {
@@ -375,15 +387,15 @@ export default function GalleryPage() {
   };
 
   const selectAllPhotos = () => {
-    if (viewMode === "deletion") {
+    if (viewMode === "selection") {
       // In deletion mode, only select photos that can be deleted
       const deletablePhotoIds = photos
-        .filter(photo => canDeletePhoto(photo.userId))
-        .map(photo => photo.id);
+        .filter((photo) => canDeletePhoto(photo.userId))
+        .map((photo) => photo.id);
       setSelectedPhotos(new Set(deletablePhotoIds));
     } else {
       // In selection mode, select all photos
-      const allIds = photos.map(photo => photo.id);
+      const allIds = photos.map((photo) => photo.id);
       setSelectedPhotos(new Set(allIds));
     }
   };
@@ -396,13 +408,13 @@ export default function GalleryPage() {
   const downloadSinglePhoto = async (photoId: string, photoUrl: string) => {
     try {
       // Create a link to download the image directly
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = photoUrl;
       link.download = `photo-${photoId}.jpg`; // Default name
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast({
         title: "Download started",
         description: "Your photo download should begin shortly.",
@@ -410,7 +422,8 @@ export default function GalleryPage() {
     } catch (error) {
       toast({
         title: "Download failed",
-        description: error instanceof Error ? error.message : "Failed to download photo",
+        description:
+          error instanceof Error ? error.message : "Failed to download photo",
         variant: "destructive",
       });
     }
@@ -427,20 +440,26 @@ export default function GalleryPage() {
       return;
     }
 
-    if (confirm("Are you sure you want to delete this photo? This action cannot be undone.")) {
+    if (
+      confirm(
+        "Are you sure you want to delete this photo? This action cannot be undone."
+      )
+    ) {
       try {
         const response = await fetch(`/api/photos/${photoId}`, {
-          method: 'DELETE',
+          method: "DELETE",
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to delete photo');
+          throw new Error(errorData.error || "Failed to delete photo");
         }
-        
+
         // Remove photo from state
-        setPhotos(prevPhotos => prevPhotos.filter(photo => photo.id !== photoId));
-        
+        setPhotos((prevPhotos) =>
+          prevPhotos.filter((photo) => photo.id !== photoId)
+        );
+
         toast({
           title: "Photo deleted",
           description: "The photo has been deleted successfully.",
@@ -448,7 +467,8 @@ export default function GalleryPage() {
       } catch (error) {
         toast({
           title: "Deletion failed",
-          description: error instanceof Error ? error.message : "Failed to delete photo",
+          description:
+            error instanceof Error ? error.message : "Failed to delete photo",
           variant: "destructive",
         });
       }
@@ -459,15 +479,18 @@ export default function GalleryPage() {
   const canDeletePhoto = (photoUserId: string): boolean => {
     console.log(
       "canDeletePhoto check:",
-      "photoUserId:", photoUserId,
-      "currentUserId:", currentUserId,
-      "userRole:", userRole,
-      "isAdmin?", userRole === 'ADMIN'
+      "photoUserId:",
+      photoUserId,
+      "currentUserId:",
+      currentUserId,
+      "userRole:",
+      userRole,
+      "isAdmin?",
+      userRole === "ADMIN"
     );
-    
+
     if (!isSignedIn) return false;
-    if (userRole === 'ADMIN') return true;
-    return currentUserId === photoUserId;
+    return userRole === "ADMIN"; // Only admins can delete photos
   };
 
   const downloadSelectedPhotos = async () => {
@@ -481,52 +504,109 @@ export default function GalleryPage() {
     }
 
     setIsDownloading(true);
+
+    // Show initial toast
+    toast({
+      title: "Download started",
+      description: `Preparing ${selectedPhotos.size} photos for download...`,
+    });
+
     try {
       // Convert Set to Array for the API request
       const photoIds = Array.from(selectedPhotos);
-      
+
+      console.log(
+        `Sending download request for ${photoIds.length} photos:`,
+        photoIds
+      );
+
+      // Use AbortController to handle timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
       // Fetch the ZIP file from our API
-      const response = await fetch('/api/gallery/download', {
-        method: 'POST',
+      const response = await fetch("/api/gallery/download", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ photoIds }),
+        signal: controller.signal,
       });
-      
+
+      // Clear timeout
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to download photos');
+        let errorMessage = "Failed to download photos";
+
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error("Error parsing error response:", parseError);
+        }
+
+        throw new Error(errorMessage);
       }
-      
+
+      // Check Content-Type to make sure we got a ZIP file
+      const contentType = response.headers.get("Content-Type");
+      if (contentType !== "application/zip") {
+        console.warn("Unexpected content type:", contentType);
+      }
+
+      // Get content length if available
+      const contentLength = response.headers.get("Content-Length");
+      console.log(
+        `Received response with size: ${contentLength || "unknown"} bytes`
+      );
+
       // Create a blob from the response
       const blob = await response.blob();
-      
+
+      if (blob.size === 0) {
+        throw new Error("Received empty file");
+      }
+
+      console.log(`Created blob of size: ${blob.size} bytes`);
+
       // Create a download link and trigger download
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
+      const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
-      a.download = 'event-photos.zip';
+      a.download = "event-photos.zip";
       document.body.appendChild(a);
       a.click();
-      
+
       // Clean up
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 1000);
+
       toast({
-        title: "Download started",
-        description: `Downloading ${selectedPhotos.size} photos as a ZIP file.`,
+        title: "Download complete",
+        description: `Successfully downloaded ${selectedPhotos.size} photos as a ZIP file.`,
       });
-      
+
       // Exit selection mode after download
       setViewMode("grid");
       setSelectedPhotos(new Set());
     } catch (error) {
+      console.error("Download error:", error);
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : error instanceof DOMException && error.name === "AbortError"
+          ? "Download request timed out. Try downloading fewer photos at once."
+          : "Failed to download photos";
+
       toast({
         title: "Download failed",
-        description: error instanceof Error ? error.message : "Failed to download photos",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -544,7 +624,11 @@ export default function GalleryPage() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete ${selectedPhotos.size} photos? This action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedPhotos.size} photos? This action cannot be undone.`
+      )
+    ) {
       return;
     }
 
@@ -552,44 +636,51 @@ export default function GalleryPage() {
     try {
       // Convert Set to Array for the API request
       const photoIds = Array.from(selectedPhotos);
-      
+
       // Send delete request to our API
-      const response = await fetch('/api/gallery/delete-multiple', {
-        method: 'POST',
+      const response = await fetch("/api/gallery/delete-multiple", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ photoIds }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete photos');
+        throw new Error(errorData.error || "Failed to delete photos");
       }
-      
+
       const result = await response.json();
-      
+
       // Remove deleted photos from state
       if (result.results.success.length > 0) {
-        setPhotos(prevPhotos => 
-          prevPhotos.filter(photo => !result.results.success.includes(photo.id))
+        setPhotos((prevPhotos) =>
+          prevPhotos.filter(
+            (photo) => !result.results.success.includes(photo.id)
+          )
         );
       }
-      
+
       toast({
         title: "Photos deleted",
-        description: `Successfully deleted ${result.results.success.length} photos.${
-          result.results.failed.length > 0 ? ` Failed to delete ${result.results.failed.length} photos.` : ''
+        description: `Successfully deleted ${
+          result.results.success.length
+        } photos.${
+          result.results.failed.length > 0
+            ? ` Failed to delete ${result.results.failed.length} photos.`
+            : ""
         }`,
       });
-      
+
       // Exit deletion mode after delete
       setViewMode("grid");
       setSelectedPhotos(new Set());
     } catch (error) {
       toast({
         title: "Deletion failed",
-        description: error instanceof Error ? error.message : "Failed to delete photos",
+        description:
+          error instanceof Error ? error.message : "Failed to delete photos",
         variant: "destructive",
       });
     } finally {
@@ -597,76 +688,88 @@ export default function GalleryPage() {
     }
   };
 
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+
+    if (typeof window !== "undefined") {
+      // Create SSE connection
+      eventSource = new EventSource("/api/gallery/updates");
+
+      // Store current pagination page to use in the event handler
+      // const currentPage = pagination?.currentPage || 1;
+
+      // Listen for events
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "new-photo") {
+          // Fetch the latest photos
+          fetchGallery(pagination?.currentPage || 1);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("EventSource error:", error);
+        eventSource?.close();
+
+        // Try to reconnect after a delay
+        setTimeout(() => {
+          eventSource = new EventSource("/api/gallery/updates");
+        }, 5000);
+      };
+    }
+
+    // Clean up on component unmount
+    return () => {
+      eventSource?.close();
+    };
+  }, [pagination?.currentPage, fetchGallery]);
+
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="flex flex-col lg:flex-row justify-between items-center mb-8 gap-4">
+    <div className="max-w-6xl lg:w-3/4 mx-auto p-4">
+      <div className="flex flex-col lg:flex-row justify-between items-center mb-4 gap-4">
         <h1 className="text-2xl font-bold text-mono-100">
           Event Photo Gallery
         </h1>
 
-        <div className="flex items-center lg:space-x-2 flex-wrap gap-2">
+        <div className="w-full lg:w-fit flex items-center justify-end lg:space-x-2 flex-wrap gap-2">
           {/* Selection/deletion mode toggles */}
+          {/* Selection mode toggle */}
           {photos.length > 0 && (
-            <>
+            <Button
+              variant="secondary"
+              onClick={toggleSelectionMode}
+              className="flex items-center"
+            >
               {viewMode === "selection" ? (
-                <Button
-                  variant="secondary"
-                  onClick={toggleSelectionMode}
-                  className="flex items-center"
-                >
-                  <X className="mr-2 h-4 w-4" />
+                <>
+                  <X className="mr-1 size-5" />
                   Cancel Selection
-                </Button>
-              ) : viewMode === "deletion" ? (
-                <Button
-                  variant="secondary"
-                  onClick={toggleDeletionMode}
-                  className="flex items-center"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel Deletion
-                </Button>
+                </>
               ) : (
                 <>
-                  <Button
-                    variant="secondary"
-                    onClick={toggleSelectionMode}
-                    className="flex items-center"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Select & Download
-                  </Button>
-                  
-                  {isSignedIn && (
-                    <Button
-                      variant="secondary"
-                      onClick={toggleDeletionMode}
-                      className="flex items-center"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Select & Delete
-                    </Button>
-                  )}
+                  <CircleCheck className="mr-1 size-5" />
+                  Select
                 </>
               )}
-            </>
+            </Button>
           )}
 
           {/* View mode toggle */}
-          {photos.length > 0 && viewMode !== "selection" && viewMode !== "deletion" && (
+          {photos.length > 0 && viewMode !== "selection" && (
             <Button
-              variant="secondary"
+              variant="primary"
               onClick={toggleViewMode}
               className="flex items-center"
             >
               {viewMode === "grid" ? (
                 <>
-                  <MonitorPlay className="mr-2 h-4 w-4" />
-                  Fullscreen Slideshow
+                  <MonitorPlay className="mr-1 size-5" />
+                  Slideshow
                 </>
               ) : (
                 <>
-                  <Grid className="mr-2 h-4 w-4" />
+                  <Grid className="mr-1 size-5" />
                   Grid View
                 </>
               )}
@@ -674,88 +777,101 @@ export default function GalleryPage() {
           )}
 
           {/* Upload button */}
-          {isSignedIn && viewMode !== "selection" && viewMode !== "deletion" && (
+          {/* {isSignedIn && viewMode !== "selection" && (
             <Link href="/upload">
               <Button variant="primary" size="sm" className="flex items-center">
                 <Camera className="mr-2 h-4 w-4" /> Upload
               </Button>
             </Link>
-          )}
+          )} */}
         </div>
       </div>
 
       {/* Selection mode controls */}
       {viewMode === "selection" && (
-        <div className="bg-gray-100 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">
+        <div className="bg-secondary-600 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex flex-row items-center gap-4">
+            <span className="font-medium text-mono-200">
               {selectedPhotos.size} of {photos.length} selected
             </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={selectAllPhotos}
-              disabled={selectedPhotos.size === photos.length}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={
+                selectedPhotos.size === photos.length
+                  ? deselectAllPhotos
+                  : selectAllPhotos
+              }
             >
-              Select All
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={deselectAllPhotos}
-              disabled={selectedPhotos.size === 0}
-            >
-              Deselect All
+              {selectedPhotos.size === photos.length
+                ? "Deselect All"
+                : "Select All"}
             </Button>
           </div>
-          <Button 
-            variant="primary" 
-            onClick={downloadSelectedPhotos}
-            disabled={selectedPhotos.size === 0 || isDownloading}
-            className="flex items-center"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {isDownloading ? "Preparing Download..." : `Download ${selectedPhotos.size} Photos`}
-          </Button>
+          <div className="flex flex-row gap-2">
+            <Button
+              variant="primary"
+              onClick={downloadSelectedPhotos}
+              disabled={selectedPhotos.size === 0 || isDownloading}
+              className="flex items-center font-normal"
+            >
+              <Download className="mr-2 size-5" />
+              {isDownloading
+                ? "Preparing Download..."
+                : `Download (${selectedPhotos.size})`}
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={deleteSelectedPhotos}
+              disabled={selectedPhotos.size === 0 || isDeleting}
+              className="flex items-center text-md text-mono-100"
+            >
+              <Trash2 className="mr-2 size-5" />
+              {isDeleting ? "Deleting..." : `Delete (${selectedPhotos.size})`}
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Deletion mode controls */}
-      {viewMode === "deletion" && (
+      {/* {viewMode === "deletion" && (
         <div className="bg-red-50 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="font-medium flex items-center">
               <AlertTriangle className="text-red-500 mr-2 h-4 w-4" />
               {selectedPhotos.size} of {photos.length} selected for deletion
             </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={selectAllPhotos}
               disabled={selectedPhotos.size === photos.length}
             >
               Select All
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={deselectAllPhotos}
               disabled={selectedPhotos.size === 0}
             >
               Deselect All
             </Button>
           </div>
-          <Button 
-            variant="destructive" 
+          <Button
+            variant="destructive"
             onClick={deleteSelectedPhotos}
             disabled={selectedPhotos.size === 0 || isDeleting}
             className="flex items-center"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            {isDeleting ? "Deleting..." : `Delete ${selectedPhotos.size} Photos`}
+            {isDeleting
+              ? "Deleting..."
+              : `Delete ${selectedPhotos.size} Photos`}
           </Button>
         </div>
-      )}
+      )} */}
 
       {isLoading && photos.length === 0 ? (
         <div className="flex justify-center items-center h-64">
@@ -785,23 +901,25 @@ export default function GalleryPage() {
         <>
           {/* Grid view */}
           {viewMode === "grid" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
                 <div
                   key={photo.id}
-                  className="bg-white rounded-lg overflow-hidden shadow-md cursor-pointer relative group"
-                  onClick={() => openLightbox(photos.findIndex(p => p.id === photo.id))}
+                  className="rounded-lg overflow-hidden shadow-md cursor-pointer relative group h-full"
+                  onClick={() =>
+                    openLightbox(photos.findIndex((p) => p.id === photo.id))
+                  }
                   onMouseEnter={() => setHoverPhotoId(photo.id)}
                   onMouseLeave={() => setHoverPhotoId(null)}
                 >
                   {/* Hover action buttons */}
                   {hoverPhotoId === photo.id && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <div className="absolute inset-0 bg-black/40 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                       <div className="flex space-x-2">
-                        <Button 
-                          variant="secondary" 
+                        <Button
+                          variant="secondary"
                           size="sm"
-                          className="rounded-full p-2"
+                          className="rounded-full p-2 bg-mono-600"
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent opening lightbox
                             downloadSinglePhoto(photo.id, photo.s3Url);
@@ -809,12 +927,12 @@ export default function GalleryPage() {
                         >
                           <Download className="h-5 w-5" />
                         </Button>
-                        
-                        {canDeletePhoto(photo.userId) && (
-                          <Button 
-                            variant="destructive" 
+
+                        {userRole === "ADMIN" && (
+                          <Button
+                            variant="destructive"
                             size="sm"
-                            className="rounded-full p-2"
+                            className="rounded-full p-2 text-mono-100"
                             onClick={(e) => {
                               e.stopPropagation(); // Prevent opening lightbox
                               deleteSinglePhoto(photo.id);
@@ -827,7 +945,7 @@ export default function GalleryPage() {
                     </div>
                   )}
 
-                  <div className="relative aspect-square">
+                  <div className="relative aspect-square ">
                     <Image
                       src={photo.s3Url}
                       alt={photo.description || "Event photo"}
@@ -836,9 +954,21 @@ export default function GalleryPage() {
                     />
                   </div>
 
-                  <div className="p-4">
+                  {/* Gradient overlay for better text visibility */}
+                  <div
+                    className="absolute bottom-0 left-0 w-full h-40 pointer-events-none"
+                    style={{
+                      background:
+                        "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0) 100%)",
+                    }}
+                  ></div>
+
+                  {/* Text content positioned at the bottom */}
+                  <div className="absolute bottom-0 left-0 w-full p-3 text-mono-100 z-10">
                     {photo.description && (
-                      <p className="text-mono-700 mb-2">{photo.description}</p>
+                      <p className="text-xs font-medium mb-1 line-clamp-1">
+                        {photo.description}
+                      </p>
                     )}
 
                     <div className="flex items-center mt-2">
@@ -848,19 +978,20 @@ export default function GalleryPage() {
                           alt={photo.user.name || "User"}
                           width={24}
                           height={24}
-                          className="rounded-full mr-2"
+                          className="rounded-full mr-2 border-1 border-secondary-300"
                         />
                       ) : (
                         <div className="w-6 h-6 bg-mono-200 rounded-full mr-2"></div>
                       )}
-                      <span className="text-sm text-mono-500">
+                      {/* <span className="text-xs text-mono-300">
                         {photo.user.name || "Anonymous"}
-                      </span>
+                      </span> */}
+                      <p
+                        className={`${spaceMono.className} text-xs text-mono-400 mt-1`}
+                      >
+                        {new Date(photo.createdAt).toLocaleString()}
+                      </p>
                     </div>
-
-                    <p className="text-xs text-mono-400 mt-1">
-                      {new Date(photo.createdAt).toLocaleString()}
-                    </p>
                   </div>
                 </div>
               ))}
@@ -869,24 +1000,32 @@ export default function GalleryPage() {
 
           {/* Selection mode grid */}
           {viewMode === "selection" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => {
                 const isSelected = selectedPhotos.has(photo.id);
                 return (
                   <div
                     key={photo.id}
-                    className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer relative ${
+                    className={`rounded-lg overflow-hidden shadow-md cursor-pointer relative group h-full ${
                       isSelected ? "ring-2 ring-primary-400" : ""
                     }`}
                     onClick={() => togglePhotoSelection(photo.id)}
                   >
-                    <div className="absolute top-2 right-2 z-10">
+                    {/* Selection indicator */}
+                    <div
+                      className="absolute top-2 right-2 z-20 bg-white rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePhotoSelection(photo.id);
+                      }}
+                    >
                       {isSelected ? (
-                        <CheckCircle className="h-6 w-6 text-primary-400 bg-white rounded-full" />
+                        <CircleCheck className="h-6 w-6 text-mono-800" />
                       ) : (
-                        <Circle className="h-6 w-6 text-white" />
+                        <Circle className="h-6 w-6 text-mono-400" />
                       )}
                     </div>
+
                     <div className="relative aspect-square">
                       <Image
                         src={photo.s3Url}
@@ -896,33 +1035,47 @@ export default function GalleryPage() {
                           isSelected ? "opacity-90" : "hover:opacity-75"
                         }`}
                       />
-                    </div>
 
-                    <div className="p-4">
-                      {photo.description && (
-                        <p className="text-mono-700 mb-2">{photo.description}</p>
-                      )}
+                      {/* Gradient overlay for better text visibility */}
+                      <div
+                        className="absolute bottom-0 left-0 w-full h-40 pointer-events-none"
+                        style={{
+                          background:
+                            "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0) 100%)",
+                        }}
+                      ></div>
 
-                      <div className="flex items-center mt-2">
-                        {photo.user.avatar ? (
-                          <Image
-                            src={photo.user.avatar}
-                            alt={photo.user.name || "User"}
-                            width={24}
-                            height={24}
-                            className="rounded-full mr-2"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 bg-mono-200 rounded-full mr-2"></div>
+                      {/* Text content positioned at the bottom */}
+                      <div className="absolute bottom-0 left-0 w-full p-3 text-white z-10">
+                        {photo.description && (
+                          <p className="text-sm font-medium mb-1 line-clamp-2">
+                            {photo.description}
+                          </p>
                         )}
-                        <span className="text-sm text-mono-500">
-                          {photo.user.name || "Anonymous"}
-                        </span>
-                      </div>
 
-                      <p className="text-xs text-mono-400 mt-1">
-                        {new Date(photo.createdAt).toLocaleString()}
-                      </p>
+                        <div className="flex items-center">
+                          {photo.user.avatar ? (
+                            <Image
+                              src={photo.user.avatar}
+                              alt={photo.user.name || "User"}
+                              width={20}
+                              height={20}
+                              className="rounded-full mr-2"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 bg-mono-300 rounded-full mr-2"></div>
+                          )}
+                          <span className="text-xs text-white/90">
+                            {photo.user.name || "Anonymous"}
+                          </span>
+                        </div>
+
+                        <p
+                          className={`${spaceMono.className} text-xs text-mono-400 mt-1`}
+                        >
+                          {new Date(photo.createdAt).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -931,18 +1084,22 @@ export default function GalleryPage() {
           )}
 
           {/* Deletion mode grid */}
-          {viewMode === "deletion" && (
+          {/* {viewMode === "deletion" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {photos.map((photo) => {
                 const isSelected = selectedPhotos.has(photo.id);
                 const canDelete = canDeletePhoto(photo.userId);
-                
+
                 return (
                   <div
                     key={photo.id}
                     className={`bg-white rounded-lg overflow-hidden shadow-md relative ${
                       isSelected ? "ring-2 ring-red-500" : ""
-                    } ${canDelete ? "cursor-pointer" : "opacity-60 cursor-not-allowed"}`}
+                    } ${
+                      canDelete
+                        ? "cursor-pointer"
+                        : "opacity-60 cursor-not-allowed"
+                    }`}
                     onClick={() => {
                       if (canDelete) togglePhotoSelection(photo.id);
                     }}
@@ -950,33 +1107,41 @@ export default function GalleryPage() {
                     {!canDelete && (
                       <div className="absolute inset-0 bg-mono-100 bg-opacity-40 z-10 flex items-center justify-center">
                         <div className="bg-white p-2 rounded-md text-xs text-center">
-                          {userRole !== 'ADMIN' ? "You can only delete your own photos" : "Cannot delete this photo"}
+                          {userRole !== "ADMIN"
+                            ? "You can only delete your own photos"
+                            : "Cannot delete this photo"}
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="absolute top-2 right-2 z-20">
                       {isSelected ? (
-                        <CheckCircle className="h-6 w-6 text-red-500 bg-white rounded-full" />
+                        <CircleCheck className="h-6 w-6 text-red-500 bg-white rounded-full" />
                       ) : (
                         <Circle className="h-6 w-6 text-white" />
                       )}
                     </div>
-                    
+
                     <div className="relative aspect-square">
                       <Image
                         src={photo.s3Url}
                         alt={photo.description || "Event photo"}
                         fill
                         className={`object-cover transition-opacity ${
-                          isSelected ? "opacity-70" : canDelete ? "hover:opacity-75" : ""
+                          isSelected
+                            ? "opacity-70"
+                            : canDelete
+                            ? "hover:opacity-75"
+                            : ""
                         }`}
                       />
                     </div>
 
                     <div className="p-4">
                       {photo.description && (
-                        <p className="text-mono-700 mb-2">{photo.description}</p>
+                        <p className="text-mono-700 mb-2">
+                          {photo.description}
+                        </p>
                       )}
 
                       <div className="flex items-center mt-2">
@@ -1004,7 +1169,7 @@ export default function GalleryPage() {
                 );
               })}
             </div>
-          )}
+          )} */}
 
           {/* Lightbox with enhanced slideshow */}
           {lightboxOpen && photos.length > 0 && (
@@ -1096,9 +1261,16 @@ export default function GalleryPage() {
                         }
                         width={1600}
                         height={1200}
-                        className="object-contain max-h-[85vh] max-w-full"
+                        className="object-contain object-center max-h-[85vh] max-w-full"
                         priority
                       />
+                      <div
+                        className="absolute bottom-0 left-0 w-full h-32 pointer-events-none"
+                        style={{
+                          background:
+                            "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0) 100%)",
+                        }}
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -1180,34 +1352,42 @@ export default function GalleryPage() {
               )}
 
               {/* Photo info and action buttons in lightbox */}
-              <div className={`bg-black ${isFullScreen ? 'bg-opacity-25 absolute bottom-0 left-0 w-full' : 'bg-opacity-50'} p-4 text-white`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    {photos[currentPhotoIndex].user.avatar ? (
-                      <Image
-                        src={photos[currentPhotoIndex].user.avatar}
-                        alt={photos[currentPhotoIndex].user.name || "User"}
-                        width={24}
-                        height={24}
-                        className="rounded-full mr-2"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 bg-gray-600 rounded-full mr-2"></div>
-                    )}
-                    <div>
-                      <span className="text-sm font-semibold">
-                        {photos[currentPhotoIndex].user.name || "Anonymous"}
-                      </span>
+              <div
+                className={`bg-secondary-800/0 ${
+                  isFullScreen
+                    ? "bg-opacity-25 absolute bottom-0 left-0 w-full"
+                    : "bg-opacity-50"
+                } p-4 text-white`}
+              >
+                <div className="flex flex-col items-center justify-between w-full gap-2">
+                  <div className="flex items-center w-full justify-center">
+                    <div className="flex flex-col gap-4">
                       {photos[currentPhotoIndex].description && (
-                        <p className="text-sm opacity-90 mt-1">
-                          {photos[currentPhotoIndex].description}
+                        <p className="text-lg opacity-90 text-center">
+                          &quot;{photos[currentPhotoIndex].description}&quot;
                         </p>
                       )}
+                      <div className="flex flex-row items-center justify-center">
+                        {photos[currentPhotoIndex].user.avatar ? (
+                          <Image
+                            src={photos[currentPhotoIndex].user.avatar}
+                            alt={photos[currentPhotoIndex].user.name || "User"}
+                            width={24}
+                            height={24}
+                            className="rounded-full mr-2"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 bg-gray-600 rounded-full mr-2"></div>
+                        )}
+                        <span className="text-sm font-semibold">
+                          {photos[currentPhotoIndex].user.name || "Anonymous"}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
-                    <Button
+                    {/* <Button
                       variant="ghost"
                       onClick={() => downloadSinglePhoto(
                         photos[currentPhotoIndex].id,
@@ -1217,9 +1397,9 @@ export default function GalleryPage() {
                       size="sm"
                     >
                       <Download className="h-5 w-5" />
-                    </Button>
-                    
-                    {canDeletePhoto(photos[currentPhotoIndex].userId) && (
+                    </Button> */}
+
+                    {/* {canDeletePhoto(photos[currentPhotoIndex].userId) && (
                       <Button
                         variant="ghost"
                         onClick={() => {
@@ -1233,10 +1413,12 @@ export default function GalleryPage() {
                       >
                         <Trash2 className="h-5 w-5" />
                       </Button>
-                    )}
-                    
+                    )} */}
+
                     <span className="text-xs opacity-75 ml-2">
-                      {new Date(photos[currentPhotoIndex].createdAt).toLocaleString()}
+                      {new Date(
+                        photos[currentPhotoIndex].createdAt
+                      ).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -1245,70 +1427,72 @@ export default function GalleryPage() {
           )}
 
           {/* Pagination - only show in grid view or selection/deletion mode */}
-          {(viewMode === "grid" || viewMode === "selection" || viewMode === "deletion") && pagination && pagination.pages > 1 && (
-            <div className="flex justify-center mt-8">
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handlePageChange(pagination.currentPage - 1)}
-                  disabled={pagination.currentPage === 1}
-                  className={`px-3 py-1 rounded-md ${
-                    pagination.currentPage === 1
-                      ? "bg-mono-100 text-mono-400 cursor-not-allowed"
-                      : "bg-mono-200 hover:bg-mono-300"
-                  }`}
-                >
-                  Previous
-                </button>
+          {(viewMode === "grid" || viewMode === "selection") &&
+            pagination &&
+            pagination.pages > 1 && (
+              <div className="flex justify-center mt-8">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage - 1)}
+                    disabled={pagination.currentPage === 1}
+                    className={`px-3 py-1 rounded-md ${
+                      pagination.currentPage === 1
+                        ? "bg-mono-100 text-mono-400 cursor-not-allowed"
+                        : "bg-mono-200 hover:bg-mono-300"
+                    }`}
+                  >
+                    Previous
+                  </button>
 
-                {Array.from({ length: pagination.pages }, (_, i) => i + 1)
-                  .filter(
-                    (page) =>
-                      page === 1 ||
-                      page === pagination.pages ||
-                      Math.abs(page - pagination.currentPage) <= 1
-                  )
-                  .map((page, index, array) => {
-                    // Add ellipsis
-                    if (index > 0 && page - array[index - 1] > 1) {
+                  {Array.from({ length: pagination.pages }, (_, i) => i + 1)
+                    .filter(
+                      (page) =>
+                        page === 1 ||
+                        page === pagination.pages ||
+                        Math.abs(page - pagination.currentPage) <= 1
+                    )
+                    .map((page, index, array) => {
+                      // Add ellipsis
+                      if (index > 0 && page - array[index - 1] > 1) {
+                        return (
+                          <span
+                            key={`ellipsis-${page}`}
+                            className="px-3 py-1 text-mono-400"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+
                       return (
-                        <span
-                          key={`ellipsis-${page}`}
-                          className="px-3 py-1 text-mono-400"
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-3 py-1 rounded-md ${
+                            pagination.currentPage === page
+                              ? "bg-secondary-400 text-white"
+                              : "bg-mono-200 hover:bg-mono-300"
+                          }`}
                         >
-                          ...
-                        </span>
+                          {page}
+                        </button>
                       );
-                    }
+                    })}
 
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                        className={`px-3 py-1 rounded-md ${
-                          pagination.currentPage === page
-                            ? "bg-secondary-400 text-white"
-                            : "bg-mono-200 hover:bg-mono-300"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  })}
-
-                <button
-                  onClick={() => handlePageChange(pagination.currentPage + 1)}
-                  disabled={pagination.currentPage === pagination.pages}
-                  className={`px-3 py-1 rounded-md ${
-                    pagination.currentPage === pagination.pages
-                      ? "bg-mono-100 text-mono-400 cursor-not-allowed"
-                      : "bg-mono-200 hover:bg-mono-300"
-                  }`}
-                >
-                  Next
-                </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage + 1)}
+                    disabled={pagination.currentPage === pagination.pages}
+                    className={`px-3 py-1 rounded-md ${
+                      pagination.currentPage === pagination.pages
+                        ? "bg-mono-100 text-mono-400 cursor-not-allowed"
+                        : "bg-mono-200 hover:bg-mono-300"
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </>
       )}
     </div>

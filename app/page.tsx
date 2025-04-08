@@ -11,6 +11,14 @@ import { useRef } from "react";
 
 import { Confetti, type ConfettiRef } from "@/components/magicui/confetti";
 
+import { Space_Mono } from "next/font/google";
+
+const spaceMono = Space_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export default function Home() {
   const { isSignedIn } = useAuth();
   const confettiRef = useRef<ConfettiRef>(null);
@@ -25,7 +33,7 @@ export default function Home() {
           className="rounded-full object-cover border-2 border-primary-400"
         />
       </div>
-      <div className="text-xl text-mono-200 text-center">
+      <div className={`${spaceMono.className} text-xl text-mono-200 text-center`}>
         Capture. Upload. Relive the Moments.
       </div>
       
@@ -45,8 +53,8 @@ export default function Home() {
         )}
         {isSignedIn && (
           <Link href="/upload">
-            <Button variant="primary" size="lg" className="w-full">
-              <Camera className="w-16 h-16" /> Upload photos
+            <Button variant="primary" size="lg" className="w-full font-bold">
+              <Camera className="size-6" /> Upload photos
             </Button>
             <Confetti
               ref={confettiRef}
