@@ -8,6 +8,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 model User {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   clerkId   String   @unique
@@ -16,6 +21,7 @@ model User {
   firstName String?
   lastName  String?
   photo     String?
+  role      UserRole @default(USER)
   createdAt DateTime? // Made optional with ? to handle null values
   updatedAt DateTime? // Made optional with ? to handle null values
   photos    Photo[]

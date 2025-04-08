@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback} from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
@@ -14,14 +14,21 @@ import {
   Grid,
   MonitorPlay,
   Expand,
+  Download,
+  CheckCircle,
+  Circle,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Photo {
   id: string;
   s3Url: string;
   description: string | null;
   createdAt: string;
+  userId: string;
   user: {
     name: string | null;
     avatar: string | null;
@@ -35,15 +42,17 @@ interface PaginationData {
   limit: number;
 }
 
-type ViewMode = "grid" | "slideshow";
+type ViewMode = "grid" | "slideshow" | "selection" | "deletion";
 type SlideTransition = "none" | "incoming" | "active" | "outgoing";
 
 export default function GalleryPage() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [pagination, setPagination] = useState<PaginationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -58,6 +67,46 @@ export default function GalleryPage() {
   // Slideshow state
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [slideshowPlaying, setSlideshowPlaying] = useState(false);
+
+  // Selection/deletion state
+  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [hoverPhotoId, setHoverPhotoId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Fetch user role
+  const fetchUserRole = useCallback(async () => {
+    if (!isSignedIn || !user) return;
+    
+    console.log("Fetching user role for", user.id);
+    
+    try {
+      const response = await fetch('/api/user/role');
+      console.log("Role API response status:", response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Role data received:", data);
+        
+        setUserRole(data.role);
+        setCurrentUserId(data.userId);
+        
+        console.log("Updated state - userRole:", data.role, "currentUserId:", data.userId);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Could not parse error response" }));
+        console.error("Error response from role API:", errorData);
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    }
+  }, [isSignedIn, user]);
+
+  useEffect(() => {
+    if (isSignedIn && user) {
+      fetchUserRole();
+    }
+  }, [isSignedIn, user, fetchUserRole]);
 
   // Define functions with useCallback to prevent dependency issues
   const closeLightbox = useCallback(() => {
@@ -221,10 +270,14 @@ export default function GalleryPage() {
   const handlePageChange = (newPage: number) => {
     if (pagination && newPage > 0 && newPage <= pagination.pages) {
       fetchGallery(newPage);
+      // Clear selections when changing pages
+      setSelectedPhotos(new Set());
     }
   };
 
   const openLightbox = (index: number) => {
+    if (viewMode === "selection" || viewMode === "deletion") return; // Don't open lightbox in selection or deletion mode
+    
     setCurrentPhotoIndex(index);
     setSlideTransition("none");
     setLightboxOpen(true);
@@ -282,6 +335,268 @@ export default function GalleryPage() {
     }, 50);
   };
 
+  // New functions for toggle operation modes
+  const toggleSelectionMode = () => {
+    if (viewMode === "selection") {
+      setViewMode("grid");
+      setSelectedPhotos(new Set());
+    } else {
+      setViewMode("selection");
+      // Close lightbox if open
+      if (lightboxOpen) {
+        closeLightbox();
+      }
+    }
+  };
+
+  const toggleDeletionMode = () => {
+    if (viewMode === "deletion") {
+      setViewMode("grid");
+      setSelectedPhotos(new Set());
+    } else {
+      setViewMode("deletion");
+      // Close lightbox if open
+      if (lightboxOpen) {
+        closeLightbox();
+      }
+    }
+  };
+
+  const togglePhotoSelection = (id: string) => {
+    setSelectedPhotos((prev) => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(id)) {
+        newSelection.delete(id);
+      } else {
+        newSelection.add(id);
+      }
+      return newSelection;
+    });
+  };
+
+  const selectAllPhotos = () => {
+    if (viewMode === "deletion") {
+      // In deletion mode, only select photos that can be deleted
+      const deletablePhotoIds = photos
+        .filter(photo => canDeletePhoto(photo.userId))
+        .map(photo => photo.id);
+      setSelectedPhotos(new Set(deletablePhotoIds));
+    } else {
+      // In selection mode, select all photos
+      const allIds = photos.map(photo => photo.id);
+      setSelectedPhotos(new Set(allIds));
+    }
+  };
+
+  const deselectAllPhotos = () => {
+    setSelectedPhotos(new Set());
+  };
+
+  // Single photo download
+  const downloadSinglePhoto = async (photoId: string, photoUrl: string) => {
+    try {
+      // Create a link to download the image directly
+      const link = document.createElement('a');
+      link.href = photoUrl;
+      link.download = `photo-${photoId}.jpg`; // Default name
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download started",
+        description: "Your photo download should begin shortly.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: error instanceof Error ? error.message : "Failed to download photo",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Single photo delete
+  const deleteSinglePhoto = async (photoId: string) => {
+    if (!isSignedIn) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to delete photos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (confirm("Are you sure you want to delete this photo? This action cannot be undone.")) {
+      try {
+        const response = await fetch(`/api/photos/${photoId}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete photo');
+        }
+        
+        // Remove photo from state
+        setPhotos(prevPhotos => prevPhotos.filter(photo => photo.id !== photoId));
+        
+        toast({
+          title: "Photo deleted",
+          description: "The photo has been deleted successfully.",
+        });
+      } catch (error) {
+        toast({
+          title: "Deletion failed",
+          description: error instanceof Error ? error.message : "Failed to delete photo",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Check if user can delete a photo
+  const canDeletePhoto = (photoUserId: string): boolean => {
+    console.log(
+      "canDeletePhoto check:",
+      "photoUserId:", photoUserId,
+      "currentUserId:", currentUserId,
+      "userRole:", userRole,
+      "isAdmin?", userRole === 'ADMIN'
+    );
+    
+    if (!isSignedIn) return false;
+    if (userRole === 'ADMIN') return true;
+    return currentUserId === photoUserId;
+  };
+
+  const downloadSelectedPhotos = async () => {
+    if (selectedPhotos.size === 0) {
+      toast({
+        title: "No photos selected",
+        description: "Please select at least one photo to download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      // Convert Set to Array for the API request
+      const photoIds = Array.from(selectedPhotos);
+      
+      // Fetch the ZIP file from our API
+      const response = await fetch('/api/gallery/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ photoIds }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to download photos');
+      }
+      
+      // Create a blob from the response
+      const blob = await response.blob();
+      
+      // Create a download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'event-photos.zip';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download started",
+        description: `Downloading ${selectedPhotos.size} photos as a ZIP file.`,
+      });
+      
+      // Exit selection mode after download
+      setViewMode("grid");
+      setSelectedPhotos(new Set());
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: error instanceof Error ? error.message : "Failed to download photos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const deleteSelectedPhotos = async () => {
+    if (selectedPhotos.size === 0) {
+      toast({
+        title: "No photos selected",
+        description: "Please select at least one photo to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedPhotos.size} photos? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Convert Set to Array for the API request
+      const photoIds = Array.from(selectedPhotos);
+      
+      // Send delete request to our API
+      const response = await fetch('/api/gallery/delete-multiple', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ photoIds }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete photos');
+      }
+      
+      const result = await response.json();
+      
+      // Remove deleted photos from state
+      if (result.results.success.length > 0) {
+        setPhotos(prevPhotos => 
+          prevPhotos.filter(photo => !result.results.success.includes(photo.id))
+        );
+      }
+      
+      toast({
+        title: "Photos deleted",
+        description: `Successfully deleted ${result.results.success.length} photos.${
+          result.results.failed.length > 0 ? ` Failed to delete ${result.results.failed.length} photos.` : ''
+        }`,
+      });
+      
+      // Exit deletion mode after delete
+      setViewMode("grid");
+      setSelectedPhotos(new Set());
+    } catch (error) {
+      toast({
+        title: "Deletion failed",
+        description: error instanceof Error ? error.message : "Failed to delete photos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-4">
       <div className="flex flex-col lg:flex-row justify-between items-center mb-8 gap-4">
@@ -289,9 +604,56 @@ export default function GalleryPage() {
           Event Photo Gallery
         </h1>
 
-        <div className="flex items-center lg:space-x-2">
-          {/* View mode toggle */}
+        <div className="flex items-center lg:space-x-2 flex-wrap gap-2">
+          {/* Selection/deletion mode toggles */}
           {photos.length > 0 && (
+            <>
+              {viewMode === "selection" ? (
+                <Button
+                  variant="secondary"
+                  onClick={toggleSelectionMode}
+                  className="flex items-center"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel Selection
+                </Button>
+              ) : viewMode === "deletion" ? (
+                <Button
+                  variant="secondary"
+                  onClick={toggleDeletionMode}
+                  className="flex items-center"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel Deletion
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={toggleSelectionMode}
+                    className="flex items-center"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Select & Download
+                  </Button>
+                  
+                  {isSignedIn && (
+                    <Button
+                      variant="secondary"
+                      onClick={toggleDeletionMode}
+                      className="flex items-center"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Select & Delete
+                    </Button>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* View mode toggle */}
+          {photos.length > 0 && viewMode !== "selection" && viewMode !== "deletion" && (
             <Button
               variant="secondary"
               onClick={toggleViewMode}
@@ -312,7 +674,7 @@ export default function GalleryPage() {
           )}
 
           {/* Upload button */}
-          {isSignedIn && (
+          {isSignedIn && viewMode !== "selection" && viewMode !== "deletion" && (
             <Link href="/upload">
               <Button variant="primary" size="sm" className="flex items-center">
                 <Camera className="mr-2 h-4 w-4" /> Upload
@@ -321,6 +683,79 @@ export default function GalleryPage() {
           )}
         </div>
       </div>
+
+      {/* Selection mode controls */}
+      {viewMode === "selection" && (
+        <div className="bg-gray-100 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">
+              {selectedPhotos.size} of {photos.length} selected
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={selectAllPhotos}
+              disabled={selectedPhotos.size === photos.length}
+            >
+              Select All
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={deselectAllPhotos}
+              disabled={selectedPhotos.size === 0}
+            >
+              Deselect All
+            </Button>
+          </div>
+          <Button 
+            variant="primary" 
+            onClick={downloadSelectedPhotos}
+            disabled={selectedPhotos.size === 0 || isDownloading}
+            className="flex items-center"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {isDownloading ? "Preparing Download..." : `Download ${selectedPhotos.size} Photos`}
+          </Button>
+        </div>
+      )}
+
+      {/* Deletion mode controls */}
+      {viewMode === "deletion" && (
+        <div className="bg-red-50 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-medium flex items-center">
+              <AlertTriangle className="text-red-500 mr-2 h-4 w-4" />
+              {selectedPhotos.size} of {photos.length} selected for deletion
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={selectAllPhotos}
+              disabled={selectedPhotos.size === photos.length}
+            >
+              Select All
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={deselectAllPhotos}
+              disabled={selectedPhotos.size === 0}
+            >
+              Deselect All
+            </Button>
+          </div>
+          <Button 
+            variant="destructive" 
+            onClick={deleteSelectedPhotos}
+            disabled={selectedPhotos.size === 0 || isDeleting}
+            className="flex items-center"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {isDeleting ? "Deleting..." : `Delete ${selectedPhotos.size} Photos`}
+          </Button>
+        </div>
+      )}
 
       {isLoading && photos.length === 0 ? (
         <div className="flex justify-center items-center h-64">
@@ -351,12 +786,47 @@ export default function GalleryPage() {
           {/* Grid view */}
           {viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {photos.map((photo, index) => (
+              {photos.map((photo) => (
                 <div
                   key={photo.id}
-                  className="bg-white rounded-lg overflow-hidden shadow-md cursor-pointer"
-                  onClick={() => openLightbox(index)}
+                  className="bg-white rounded-lg overflow-hidden shadow-md cursor-pointer relative group"
+                  onClick={() => openLightbox(photos.findIndex(p => p.id === photo.id))}
+                  onMouseEnter={() => setHoverPhotoId(photo.id)}
+                  onMouseLeave={() => setHoverPhotoId(null)}
                 >
+                  {/* Hover action buttons */}
+                  {hoverPhotoId === photo.id && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          className="rounded-full p-2"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent opening lightbox
+                            downloadSinglePhoto(photo.id, photo.s3Url);
+                          }}
+                        >
+                          <Download className="h-5 w-5" />
+                        </Button>
+                        
+                        {canDeletePhoto(photo.userId) && (
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            className="rounded-full p-2"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent opening lightbox
+                              deleteSinglePhoto(photo.id);
+                            }}
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="relative aspect-square">
                     <Image
                       src={photo.s3Url}
@@ -394,6 +864,145 @@ export default function GalleryPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Selection mode grid */}
+          {viewMode === "selection" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {photos.map((photo) => {
+                const isSelected = selectedPhotos.has(photo.id);
+                return (
+                  <div
+                    key={photo.id}
+                    className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer relative ${
+                      isSelected ? "ring-2 ring-primary-400" : ""
+                    }`}
+                    onClick={() => togglePhotoSelection(photo.id)}
+                  >
+                    <div className="absolute top-2 right-2 z-10">
+                      {isSelected ? (
+                        <CheckCircle className="h-6 w-6 text-primary-400 bg-white rounded-full" />
+                      ) : (
+                        <Circle className="h-6 w-6 text-white" />
+                      )}
+                    </div>
+                    <div className="relative aspect-square">
+                      <Image
+                        src={photo.s3Url}
+                        alt={photo.description || "Event photo"}
+                        fill
+                        className={`object-cover transition-opacity ${
+                          isSelected ? "opacity-90" : "hover:opacity-75"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="p-4">
+                      {photo.description && (
+                        <p className="text-mono-700 mb-2">{photo.description}</p>
+                      )}
+
+                      <div className="flex items-center mt-2">
+                        {photo.user.avatar ? (
+                          <Image
+                            src={photo.user.avatar}
+                            alt={photo.user.name || "User"}
+                            width={24}
+                            height={24}
+                            className="rounded-full mr-2"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 bg-mono-200 rounded-full mr-2"></div>
+                        )}
+                        <span className="text-sm text-mono-500">
+                          {photo.user.name || "Anonymous"}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-mono-400 mt-1">
+                        {new Date(photo.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Deletion mode grid */}
+          {viewMode === "deletion" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {photos.map((photo) => {
+                const isSelected = selectedPhotos.has(photo.id);
+                const canDelete = canDeletePhoto(photo.userId);
+                
+                return (
+                  <div
+                    key={photo.id}
+                    className={`bg-white rounded-lg overflow-hidden shadow-md relative ${
+                      isSelected ? "ring-2 ring-red-500" : ""
+                    } ${canDelete ? "cursor-pointer" : "opacity-60 cursor-not-allowed"}`}
+                    onClick={() => {
+                      if (canDelete) togglePhotoSelection(photo.id);
+                    }}
+                  >
+                    {!canDelete && (
+                      <div className="absolute inset-0 bg-mono-100 bg-opacity-40 z-10 flex items-center justify-center">
+                        <div className="bg-white p-2 rounded-md text-xs text-center">
+                          {userRole !== 'ADMIN' ? "You can only delete your own photos" : "Cannot delete this photo"}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="absolute top-2 right-2 z-20">
+                      {isSelected ? (
+                        <CheckCircle className="h-6 w-6 text-red-500 bg-white rounded-full" />
+                      ) : (
+                        <Circle className="h-6 w-6 text-white" />
+                      )}
+                    </div>
+                    
+                    <div className="relative aspect-square">
+                      <Image
+                        src={photo.s3Url}
+                        alt={photo.description || "Event photo"}
+                        fill
+                        className={`object-cover transition-opacity ${
+                          isSelected ? "opacity-70" : canDelete ? "hover:opacity-75" : ""
+                        }`}
+                      />
+                    </div>
+
+                    <div className="p-4">
+                      {photo.description && (
+                        <p className="text-mono-700 mb-2">{photo.description}</p>
+                      )}
+
+                      <div className="flex items-center mt-2">
+                        {photo.user.avatar ? (
+                          <Image
+                            src={photo.user.avatar}
+                            alt={photo.user.name || "User"}
+                            width={24}
+                            height={24}
+                            className="rounded-full mr-2"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 bg-mono-200 rounded-full mr-2"></div>
+                        )}
+                        <span className="text-sm text-mono-500">
+                          {photo.user.name || "Anonymous"}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-mono-400 mt-1">
+                        {new Date(photo.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -570,7 +1179,7 @@ export default function GalleryPage() {
                 </div>
               )}
 
-              {/* Photo info - show in all modes with different styling */}
+              {/* Photo info and action buttons in lightbox */}
               <div className={`bg-black ${isFullScreen ? 'bg-opacity-25 absolute bottom-0 left-0 w-full' : 'bg-opacity-50'} p-4 text-white`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -596,16 +1205,47 @@ export default function GalleryPage() {
                       )}
                     </div>
                   </div>
-                  <span className="text-xs opacity-75">
-                    {new Date(photos[currentPhotoIndex].createdAt).toLocaleString()}
-                  </span>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => downloadSinglePhoto(
+                        photos[currentPhotoIndex].id,
+                        photos[currentPhotoIndex].s3Url
+                      )}
+                      className="text-white hover:bg-white hover:bg-opacity-20 rounded-full"
+                      size="sm"
+                    >
+                      <Download className="h-5 w-5" />
+                    </Button>
+                    
+                    {canDeletePhoto(photos[currentPhotoIndex].userId) && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          closeLightbox();
+                          setTimeout(() => {
+                            deleteSinglePhoto(photos[currentPhotoIndex].id);
+                          }, 300);
+                        }}
+                        className="text-red-500 hover:bg-red-500 hover:bg-opacity-20 rounded-full"
+                        size="sm"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    )}
+                    
+                    <span className="text-xs opacity-75 ml-2">
+                      {new Date(photos[currentPhotoIndex].createdAt).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Pagination - only show in grid view */}
-          {viewMode === "grid" && pagination && pagination.pages > 1 && (
+          {/* Pagination - only show in grid view or selection/deletion mode */}
+          {(viewMode === "grid" || viewMode === "selection" || viewMode === "deletion") && pagination && pagination.pages > 1 && (
             <div className="flex justify-center mt-8">
               <div className="flex space-x-2">
                 <button
