@@ -4,9 +4,11 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
 import Image from "next/image";
-import { Camera, X, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Camera, X, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { Progress } from "@/components/ui/progress"; // Import Progress component
 
 type FileWithPreview = {
   file: File;
@@ -15,11 +17,13 @@ type FileWithPreview = {
   status: "pending" | "uploading" | "success" | "error";
   description: string;
   errorMessage?: string;
+  uploadProgress?: number; // Add upload progress tracking
 };
 
 export default function UploadPage() {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
+  const { toast } = useToast();
 
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -27,18 +31,11 @@ export default function UploadPage() {
   const [uploadCount, setUploadCount] = useState(0);
   const [remainingUploads, setRemainingUploads] = useState(10);
   const [totalGalleryCount, setTotalGalleryCount] = useState(0);
-  const maxUploads = 10; // Maximum number of photos allowed
+  const [isLoadingCounts, setIsLoadingCounts] = useState(true);
+  const [overallProgress, setOverallProgress] = useState(0);
+  const maxUploads = 10;
 
-  // const [file, setFile] = useState<FileWithPreview[]>([]);
-  // const [preview, setPreview] = useState<string | null>(null);
-  // const [description, setDescription] = useState("");
-  // const [isUploading, setIsUploading] = useState(false);
-  // const [error, setError] = useState<string | null>(null);
-  // const [uploadCount, setUploadCount] = useState(0);
-  // const [remainingUploads, setRemainingUploads] = useState(10);
-  // const maxUploads = 10; // Maximum number of photos allowed
-
-  // Redirect if not signed in - moved to useEffect
+  // Redirect if not signed in
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push("/sign-in");
@@ -56,6 +53,7 @@ export default function UploadPage() {
   useEffect(() => {
     const fetchPhotoCount = async () => {
       if (!isSignedIn) return;
+      setIsLoadingCounts(true);
 
       try {
         const response = await fetch("/api/user/photo-count");
@@ -67,6 +65,8 @@ export default function UploadPage() {
         }
       } catch (error) {
         console.error("Failed to fetch photo count:", error);
+      } finally {
+        setIsLoadingCounts(false);
       }
     };
 
@@ -76,6 +76,7 @@ export default function UploadPage() {
   // New effect to fetch total gallery count
   useEffect(() => {
     const fetchTotalGalleryCount = async () => {
+      setIsLoadingCounts(true);
       try {
         const response = await fetch("/api/gallery?count=true");
         if (response.ok) {
@@ -84,6 +85,8 @@ export default function UploadPage() {
         }
       } catch (error) {
         console.error("Error fetching gallery count:", error);
+      } finally {
+        setIsLoadingCounts(false);
       }
     };
     
@@ -104,6 +107,7 @@ export default function UploadPage() {
         id: Math.random().toString(36).substring(2, 9),
         status: "pending" as const,
         description: "",
+        uploadProgress: 0,
       }));
 
       setFiles((prevFiles) => [...prevFiles, ...newFiles]);
@@ -118,7 +122,7 @@ export default function UploadPage() {
       "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".heic"],
     },
     maxFiles: remainingUploads,
-    multiple: true, // Allow multiple files
+    multiple: true,
   });
 
   // Handle description change for a specific file
@@ -139,6 +143,44 @@ export default function UploadPage() {
     });
   };
 
+  // Simulated progress update (since fetch doesn't provide upload progress)
+  const simulateProgress = (fileId: string) => {
+    // Simulate progress steps
+    const progressSteps = [10, 25, 40, 60, 75, 90, 95];
+    let stepIndex = 0;
+
+    const interval = setInterval(() => {
+      if (stepIndex < progressSteps.length) {
+        // Update progress for this specific file
+        setFiles(prevFiles => 
+          prevFiles.map(f => 
+            f.id === fileId 
+              ? { ...f, uploadProgress: progressSteps[stepIndex] } 
+              : f
+          )
+        );
+        
+        // Update overall progress
+        updateOverallProgress();
+        
+        stepIndex++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 500); // Adjust timing as needed
+
+    return interval;
+  };
+
+  // Calculate overall progress
+  const updateOverallProgress = () => {
+    if (files.length === 0) return;
+
+    const totalProgress = files.reduce((sum, file) => sum + (file.uploadProgress || 0), 0);
+    const average = totalProgress / files.length;
+    setOverallProgress(average);
+  };
+
   // Handle upload of all files
   const handleUploadAll = async () => {
     if (files.length === 0 || !user) return;
@@ -157,20 +199,35 @@ export default function UploadPage() {
 
     setIsUploading(true);
     setError(null);
+    setOverallProgress(0);
 
     // Mark all files as uploading
     setFiles((prevFiles) =>
-      prevFiles.map((file) => ({ ...file, status: "uploading" }))
+      prevFiles.map((file) => ({ ...file, status: "uploading", uploadProgress: 0 }))
     );
+
+    // Store progress update intervals to clear later
+    const intervals: NodeJS.Timeout[] = [];
 
     // Upload each file sequentially
     let successCount = 0;
+    let failCount = 0;
+
+    // Toast for starting the upload process
+    toast({
+      title: "Reading and preparing your images",
+      description: "Please wait while we process your photos...",
+    });
 
     for (const fileObj of files) {
       // Skip already uploaded files
       if (fileObj.status === "success") {
         continue;
       }
+
+      // Start simulated progress updates
+      const progressInterval = simulateProgress(fileObj.id);
+      intervals.push(progressInterval);
 
       try {
         const formData = new FormData();
@@ -187,6 +244,9 @@ export default function UploadPage() {
 
         const result = await response.json();
 
+        // Clear the progress interval
+        clearInterval(progressInterval);
+
         if (!response.ok) {
           // Mark this specific file as failed
           setFiles((prevFiles) =>
@@ -195,38 +255,81 @@ export default function UploadPage() {
                 ? {
                     ...f,
                     status: "error",
+                    uploadProgress: 0,
                     errorMessage:
                       result.reason || result.error || "Upload failed",
                   }
                 : f
             )
           );
+          failCount++;
         } else {
           // Mark this file as successful
           setFiles((prevFiles) =>
             prevFiles.map((f) =>
-              f.id === fileObj.id ? { ...f, status: "success" } : f
+              f.id === fileObj.id 
+                ? { ...f, status: "success", uploadProgress: 100 } 
+                : f
             )
           );
           successCount++;
         }
+
+        // Update overall progress
+        updateOverallProgress();
       } catch (error: unknown) {
+        // Clear the progress interval
+        clearInterval(progressInterval);
+
         const errorMessage =
           error instanceof Error ? error.message : "Failed to upload image";
 
         // Mark this file as failed
         setFiles((prevFiles) =>
           prevFiles.map((f) =>
-            f.id === fileObj.id ? { ...f, status: "error", errorMessage } : f
+            f.id === fileObj.id 
+              ? { ...f, status: "error", uploadProgress: 0, errorMessage } 
+              : f
           )
         );
+        failCount++;
+
+        // Update overall progress
+        updateOverallProgress();
       }
     }
+
+    // Clear all progress intervals
+    intervals.forEach(interval => clearInterval(interval));
+    
+    // Set overall progress to 100 when complete
+    setOverallProgress(100);
 
     // Update counts based on successful uploads
     if (successCount > 0) {
       setUploadCount((prev) => prev + successCount);
       setRemainingUploads((prev) => prev - successCount);
+      setTotalGalleryCount((prev) => prev + successCount);
+
+      // Show success toast
+      toast({
+        title: "Upload Complete",
+        description: `${successCount} ${successCount === 1 ? 'photo' : 'photos'} uploaded successfully.`,
+      });
+
+      // Remove successfully uploaded photos from the view
+      setTimeout(() => {
+        setFiles(prevFiles => prevFiles.filter(f => f.status !== "success"));
+        setOverallProgress(0); // Reset progress after uploads are removed
+      }, 1500);
+    }
+
+    if (failCount > 0) {
+      toast({
+        title: "Some uploads failed",
+        description: `${failCount} ${failCount === 1 ? 'photo' : 'photos'} failed to upload.`,
+        variant: "destructive"
+      });
     }
 
     setIsUploading(false);
@@ -313,15 +416,22 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Progress indicator */}
+      {/* Progress indicator with loading state */}
       <div className="mb-8 mt-12">
-        <p className="text-lg mb-2 text-primary-400 justify-center text-center">
-          {uploadCount} of {maxUploads} photos uploaded ({remainingUploads}{" "}
-          remaining)
-        </p>
+        {isLoadingCounts ? (
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <Loader2 className="h-4 w-4 animate-spin text-primary-400" />
+            <p className="text-mono-400">Loading your upload information...</p>
+          </div>
+        ) : (
+          <p className="text-lg mb-2 text-primary-400 justify-center text-center">
+            {uploadCount} of {maxUploads} photos uploaded ({remainingUploads}{" "}
+            remaining)
+          </p>
+        )}
         <div className="w-full bg-mono-200 rounded-full h-2.5">
           <div
-            className="bg-rose-600 h-2.5 rounded-full"
+            className="bg-rose-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
             style={{ width: `${(uploadCount / maxUploads) * 100}%` }}
           ></div>
         </div>
@@ -381,6 +491,17 @@ export default function UploadPage() {
                 Selected Photos ({files.length})
               </h3>
 
+              {/* Overall upload progress bar - only show during upload */}
+              {isUploading && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-mono-400">Reading and preparing your images...</p>
+                    <span className="text-sm font-medium text-primary-400">{Math.round(overallProgress)}%</span>
+                  </div>
+                  <Progress value={overallProgress} className="h-2 w-full" />
+                </div>
+              )}
+
               {/* Photo thumbnails grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {files.map((fileObj) => (
@@ -406,6 +527,7 @@ export default function UploadPage() {
                       onClick={() => handleRemoveFile(fileObj.id)}
                       className="absolute top-2 left-2 z-10 bg-black bg-opacity-60 text-white rounded-full p-1 hover:bg-opacity-80"
                       type="button"
+                      disabled={isUploading}
                     >
                       <X size={16} />
                     </button>
@@ -418,6 +540,12 @@ export default function UploadPage() {
                         fill
                         className="object-cover"
                       />
+                      {/* Individual file upload progress overlay */}
+                      {fileObj.status === "uploading" && (fileObj.uploadProgress || 0) > 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 text-center">
+                          Processing... {fileObj.uploadProgress}%
+                        </div>
+                      )}
                     </div>
 
                     {/* Error message if any */}
@@ -459,11 +587,16 @@ export default function UploadPage() {
                       : "bg-primary-400 hover:bg-primary-600"
                   }`}
                 >
-                  {isUploading
-                    ? "Uploading..."
-                    : `Upload ${pendingFiles.length} Photo${
-                        pendingFiles.length !== 1 ? "s" : ""
-                      }`}
+                  {isUploading ? (
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Reading and preparing images...
+                    </div>
+                  ) : (
+                    `Upload ${pendingFiles.length} Photo${
+                      pendingFiles.length !== 1 ? "s" : ""
+                    }`
+                  )}
                 </Button>
               )}
 

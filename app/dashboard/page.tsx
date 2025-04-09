@@ -142,7 +142,7 @@ export default function MyPhotosPage() {
                     />
 
                     {/* Delete button overlay */}
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <div className="absolute inset-0 bg-mono-900/60 bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                       <button
                         onClick={() => handleDeletePhoto(photo.id)}
                         disabled={deleteLoading === photo.id}

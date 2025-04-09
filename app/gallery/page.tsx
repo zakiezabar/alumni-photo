@@ -914,7 +914,7 @@ export default function GalleryPage() {
                 >
                   {/* Hover action buttons */}
                   {hoverPhotoId === photo.id && (
-                    <div className="absolute inset-0 bg-black/40 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <div className="absolute inset-0 bg-mono-900/60 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10">
                       <div className="flex space-x-2">
                         <Button
                           variant="secondary"

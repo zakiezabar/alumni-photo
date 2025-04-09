@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useEffect } from "react"
 import { X } from "lucide-react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -26,6 +27,8 @@ export interface ToastProps
     VariantProps<typeof toastVariants> {
   open?: boolean
   onClose?: () => void
+  autoClose?: boolean
+  duration?: number
 }
 
 export function Toast({
@@ -33,8 +36,23 @@ export function Toast({
   variant,
   open,
   onClose,
+  autoClose = true,
+  duration = 5000,
   ...props
 }: ToastProps) {
+  // Effect for auto-closing the toast
+  useEffect (() => {
+    if (open && autoClose && onClose) {
+      const timer = setTimeout(() => {
+        onClose()
+      }, duration)
+
+      //Clean up the timer if the component unmounts or if open changes
+      return () => {
+        clearTimeout(timer)
+      }
+    }
+  }, [open, autoClose, onClose, duration])
   return (
     open && (
       <div
