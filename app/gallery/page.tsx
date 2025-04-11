@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
@@ -40,12 +40,7 @@ interface Photo {
   };
 }
 
-interface PaginationData {
-  total: number;
-  pages: number;
-  currentPage: number;
-  limit: number;
-}
+// No longer need the PaginationData interface for infinite scroll
 
 type ViewMode = "grid" | "slideshow" | "selection";
 type SlideTransition = "none" | "incoming" | "active" | "outgoing";
@@ -53,11 +48,16 @@ type SlideTransition = "none" | "incoming" | "active" | "outgoing";
 export default function GalleryPage() {
   const { isSignedIn, user } = useUser();
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [pagination, setPagination] = useState<PaginationData | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Infinite scroll observer
+  const loadingRef = useRef<HTMLDivElement>(null);
+  const lastPhotoRef = useRef<HTMLDivElement>(null); // Reference to the last photo element
 
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -170,30 +170,240 @@ export default function GalleryPage() {
     [currentPhotoIndex, photos.length]
   );
 
-  const fetchGallery = useCallback(async (page = 1) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/gallery?page=${page}&limit=12`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch gallery");
-      }
-
-      const data = await response.json();
-      setPhotos(data.photos);
-      setPagination(data.pagination);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An error occurred";
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
+  // Fetch more photos when page changes - NOT USED NOW (replaced by direct fetch in loadMorePhotos)
+  // Only keeping this function for compatibility with other parts of the code
+  const fetchGallery = useCallback(async (pageNum: number, append = false) => {
+    console.log(
+      `⚠️ Legacy fetchGallery called but not used: page=${pageNum}, append=${append}`
+    );
+    // This function is no longer used directly
   }, []);
 
+  // Initial fetch when component mounts
   useEffect(() => {
-    fetchGallery(1);
-  }, [fetchGallery]);
+    console.log("⭐ Initial fetch triggered");
+    // Force initial load with a fresh state
+    setIsLoading(true);
+    setHasMore(true);
+    setPage(1);
+
+    const initialFetch = async () => {
+      try {
+        console.log("🔄 Performing initial fetch for page 1");
+        const response = await fetch(`/api/gallery?page=1&limit=12`);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch gallery");
+        }
+
+        const data = await response.json();
+        console.log(
+          `✅ Initial fetch received ${data.photos?.length || 0} photos`
+        );
+
+        if (!data.photos || data.photos.length === 0) {
+          console.log("❌ No photos returned in initial fetch");
+          setHasMore(false);
+        } else {
+          setPhotos(data.photos);
+
+          // Check if we have more pages
+          const hasMorePages =
+            data.photos.length === 12 &&
+            (!data.pagination || data.pagination.pages > 1);
+
+          setHasMore(hasMorePages);
+          console.log(`📊 Initial fetch - hasMore set to ${hasMorePages}`);
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        setError(errorMessage);
+        console.error("❌ Error in initial fetch:", errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialFetch();
+  }, []);
+
+  // Function to load more photos (for infinite scroll)
+  const loadMorePhotos = useCallback(() => {
+    if (isLoading || !hasMore) {
+      console.log(
+        `⏸️ Load more prevented: isLoading=${isLoading}, hasMore=${hasMore}`
+      );
+      return;
+    }
+
+    const nextPage = page + 1;
+    console.log(`🔄 Loading more photos - page ${nextPage}`);
+
+    setIsLoading(true);
+
+    // Fetch next page
+    const fetchMorePhotos = async () => {
+      try {
+        const response = await fetch(`/api/gallery?page=${nextPage}&limit=12`);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch more photos");
+        }
+
+        const data = await response.json();
+        console.log(
+          `✅ Page ${nextPage} received ${data.photos?.length || 0} photos`
+        );
+
+        if (!data.photos || data.photos.length === 0) {
+          console.log("🏁 No more photos available");
+          setHasMore(false);
+          return;
+        }
+
+        // Add new photos to existing ones (avoiding duplicates)
+        setPhotos((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newPhotos = data.photos.filter(
+            (photo: Photo) => !existingIds.has(photo.id)
+          );
+          console.log(
+            `➕ Adding ${newPhotos.length} new photos to existing ${prev.length}`
+          );
+          return [...prev, ...newPhotos];
+        });
+
+        // Update page number
+        setPage(nextPage);
+
+        // Check if we've reached the end
+        const reachedEnd =
+          data.photos.length < 12 ||
+          (data.pagination && nextPage >= data.pagination.pages);
+
+        if (reachedEnd) {
+          console.log("🏁 Reached the end of available photos");
+          setHasMore(false);
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        setError(errorMessage);
+        console.error(`❌ Error loading more photos:`, errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMorePhotos();
+  }, [isLoading, hasMore, page]);
+
+  // Set up scroll event listener for infinite scrolling - with debounce
+  useEffect(() => {
+    // Simple throttle implementation
+    let isThrottled = false;
+
+    const handleScroll = () => {
+      if (isThrottled) return;
+
+      // Check if we're near the bottom of the page
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const documentHeight = document.body.offsetHeight;
+      const scrollThreshold = documentHeight - 500;
+
+      if (scrollPosition >= scrollThreshold && !isLoading && hasMore) {
+        console.log(
+          `📜 Scroll triggered at ${Math.round(
+            scrollPosition
+          )}px / ${documentHeight}px`
+        );
+
+        // Throttle to prevent multiple triggers
+        isThrottled = true;
+        loadMorePhotos();
+
+        // Reset throttle after 1s
+        setTimeout(() => {
+          isThrottled = false;
+        }, 1000);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isLoading, hasMore, loadMorePhotos]);
+
+  // Basic intersection observer for loading indicator
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isLoading && hasMore) {
+          console.log("👁️ Loading indicator visible, triggering load");
+          loadMorePhotos();
+        }
+      },
+      { rootMargin: "100px 0px" }
+    );
+
+    const currentLoadingRef = loadingRef.current;
+    if (currentLoadingRef) {
+      observer.observe(currentLoadingRef);
+    }
+
+    return () => {
+      if (currentLoadingRef) {
+        observer.unobserve(currentLoadingRef);
+      }
+    };
+  }, [isLoading, hasMore, loadMorePhotos]);
+
+  // Also observe the last photo element, but with throttling
+  useEffect(() => {
+    // Don't set up this observer until we have photos
+    if (photos.length === 0) return;
+
+    let isThrottled = false;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0]?.isIntersecting &&
+          !isLoading &&
+          hasMore &&
+          !isThrottled
+        ) {
+          console.log("🖼️ Last photo is visible, loading more");
+          isThrottled = true;
+          loadMorePhotos();
+
+          // Reset throttle after 1 second
+          setTimeout(() => {
+            isThrottled = false;
+          }, 1000);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentLastPhotoRef = lastPhotoRef.current;
+    if (currentLastPhotoRef) {
+      observer.observe(currentLastPhotoRef);
+    }
+
+    return () => {
+      if (currentLastPhotoRef) {
+        observer.unobserve(currentLastPhotoRef);
+      }
+    };
+  }, [isLoading, hasMore, loadMorePhotos, photos.length]);
+
+  // Fetch more photos when page changes
+  useEffect(() => {
+    if (page > 1) {
+      fetchGallery(page, true);
+    }
+  }, [page, fetchGallery]);
 
   // Keyboard navigation for lightbox
   useEffect(() => {
@@ -279,16 +489,8 @@ export default function GalleryPage() {
     }
   }, [viewMode]);
 
-  const handlePageChange = (newPage: number) => {
-    if (pagination && newPage > 0 && newPage <= pagination.pages) {
-      fetchGallery(newPage);
-      // Clear selections when changing pages
-      setSelectedPhotos(new Set());
-    }
-  };
-
   const openLightbox = (index: number) => {
-    if (viewMode === "selection") return; // Don't open lightbox in selection or deletion mode
+    if (viewMode === "selection") return; // Don't open lightbox in selection mode
 
     setCurrentPhotoIndex(index);
     setSlideTransition("none");
@@ -361,19 +563,6 @@ export default function GalleryPage() {
     }
   };
 
-  // const toggleDeletionMode = () => {
-  //   if (viewMode === "deletion") {
-  //     setViewMode("grid");
-  //     setSelectedPhotos(new Set());
-  //   } else {
-  //     setViewMode("deletion");
-  //     // Close lightbox if open
-  //     if (lightboxOpen) {
-  //       closeLightbox();
-  //     }
-  //   }
-  // };
-
   const togglePhotoSelection = (id: string) => {
     setSelectedPhotos((prev) => {
       const newSelection = new Set(prev);
@@ -387,7 +576,28 @@ export default function GalleryPage() {
   };
 
   const selectAllPhotos = () => {
+    if (photos.length === 0) {
+      console.log("No photos to select");
+      return;
+    }
+
+    console.log("Select All button clicked, photos count:", photos.length);
+
+    // In selection mode
     if (viewMode === "selection") {
+      // Create a new Set with all photo IDs
+      const allPhotoIds = photos.map((photo) => photo.id);
+      console.log("Setting selected photos:", allPhotoIds);
+
+      // Explicitly create a new Set instance to ensure state update
+      setSelectedPhotos(new Set(allPhotoIds));
+
+      // Add a toast notification for user feedback
+      toast({
+        title: "All photos selected",
+        description: `Selected ${allPhotoIds.length} photos`,
+      });
+
       // In deletion mode, only select photos that can be deleted
       const deletablePhotoIds = photos
         .filter((photo) => canDeletePhoto(photo.userId))
@@ -695,16 +905,13 @@ export default function GalleryPage() {
       // Create SSE connection
       eventSource = new EventSource("/api/gallery/updates");
 
-      // Store current pagination page to use in the event handler
-      // const currentPage = pagination?.currentPage || 1;
-
       // Listen for events
       eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
         if (data.type === "new-photo") {
-          // Fetch the latest photos
-          fetchGallery(pagination?.currentPage || 1);
+          // Fetch the latest photos - reset to first page when new photos arrive
+          fetchGallery(1, false);
         }
       };
 
@@ -723,7 +930,7 @@ export default function GalleryPage() {
     return () => {
       eventSource?.close();
     };
-  }, [pagination?.currentPage, fetchGallery]);
+  }, [fetchGallery]);
 
   return (
     <div className="max-w-6xl lg:w-3/4 mx-auto p-4">
@@ -834,45 +1041,6 @@ export default function GalleryPage() {
         </div>
       )}
 
-      {/* Deletion mode controls */}
-      {/* {viewMode === "deletion" && (
-        <div className="bg-red-50 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-medium flex items-center">
-              <AlertTriangle className="text-red-500 mr-2 h-4 w-4" />
-              {selectedPhotos.size} of {photos.length} selected for deletion
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={selectAllPhotos}
-              disabled={selectedPhotos.size === photos.length}
-            >
-              Select All
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={deselectAllPhotos}
-              disabled={selectedPhotos.size === 0}
-            >
-              Deselect All
-            </Button>
-          </div>
-          <Button
-            variant="destructive"
-            onClick={deleteSelectedPhotos}
-            disabled={selectedPhotos.size === 0 || isDeleting}
-            className="flex items-center"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            {isDeleting
-              ? "Deleting..."
-              : `Delete ${selectedPhotos.size} Photos`}
-          </Button>
-        </div>
-      )} */}
-
       {isLoading && photos.length === 0 ? (
         <div className="flex justify-center items-center h-64">
           <p className="text-lg text-mono-500">Loading gallery...</p>
@@ -902,9 +1070,11 @@ export default function GalleryPage() {
           {/* Grid view */}
           {viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {photos.map((photo) => (
+              {photos.map((photo, index) => (
                 <div
                   key={photo.id}
+                  // Add ref to the last photo element
+                  ref={index === photos.length - 1 ? lastPhotoRef : null}
                   className="rounded-lg overflow-hidden shadow-md cursor-pointer relative group h-full"
                   onClick={() =>
                     openLightbox(photos.findIndex((p) => p.id === photo.id))
@@ -1082,94 +1252,6 @@ export default function GalleryPage() {
               })}
             </div>
           )}
-
-          {/* Deletion mode grid */}
-          {/* {viewMode === "deletion" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {photos.map((photo) => {
-                const isSelected = selectedPhotos.has(photo.id);
-                const canDelete = canDeletePhoto(photo.userId);
-
-                return (
-                  <div
-                    key={photo.id}
-                    className={`bg-white rounded-lg overflow-hidden shadow-md relative ${
-                      isSelected ? "ring-2 ring-red-500" : ""
-                    } ${
-                      canDelete
-                        ? "cursor-pointer"
-                        : "opacity-60 cursor-not-allowed"
-                    }`}
-                    onClick={() => {
-                      if (canDelete) togglePhotoSelection(photo.id);
-                    }}
-                  >
-                    {!canDelete && (
-                      <div className="absolute inset-0 bg-mono-100 bg-opacity-40 z-10 flex items-center justify-center">
-                        <div className="bg-white p-2 rounded-md text-xs text-center">
-                          {userRole !== "ADMIN"
-                            ? "You can only delete your own photos"
-                            : "Cannot delete this photo"}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="absolute top-2 right-2 z-20">
-                      {isSelected ? (
-                        <CircleCheck className="h-6 w-6 text-red-500 bg-white rounded-full" />
-                      ) : (
-                        <Circle className="h-6 w-6 text-white" />
-                      )}
-                    </div>
-
-                    <div className="relative aspect-square">
-                      <Image
-                        src={photo.s3Url}
-                        alt={photo.description || "Event photo"}
-                        fill
-                        className={`object-cover transition-opacity ${
-                          isSelected
-                            ? "opacity-70"
-                            : canDelete
-                            ? "hover:opacity-75"
-                            : ""
-                        }`}
-                      />
-                    </div>
-
-                    <div className="p-4">
-                      {photo.description && (
-                        <p className="text-mono-700 mb-2">
-                          {photo.description}
-                        </p>
-                      )}
-
-                      <div className="flex items-center mt-2">
-                        {photo.user.avatar ? (
-                          <Image
-                            src={photo.user.avatar}
-                            alt={photo.user.name || "User"}
-                            width={24}
-                            height={24}
-                            className="rounded-full mr-2"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 bg-mono-200 rounded-full mr-2"></div>
-                        )}
-                        <span className="text-sm text-mono-500">
-                          {photo.user.name || "Anonymous"}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-mono-400 mt-1">
-                        {new Date(photo.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )} */}
 
           {/* Lightbox with enhanced slideshow */}
           {lightboxOpen && photos.length > 0 && (
@@ -1387,34 +1469,6 @@ export default function GalleryPage() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    {/* <Button
-                      variant="ghost"
-                      onClick={() => downloadSinglePhoto(
-                        photos[currentPhotoIndex].id,
-                        photos[currentPhotoIndex].s3Url
-                      )}
-                      className="text-white hover:bg-white hover:bg-opacity-20 rounded-full"
-                      size="sm"
-                    >
-                      <Download className="h-5 w-5" />
-                    </Button> */}
-
-                    {/* {canDeletePhoto(photos[currentPhotoIndex].userId) && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          closeLightbox();
-                          setTimeout(() => {
-                            deleteSinglePhoto(photos[currentPhotoIndex].id);
-                          }, 300);
-                        }}
-                        className="text-red-500 hover:bg-red-500 hover:bg-opacity-20 rounded-full"
-                        size="sm"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </Button>
-                    )} */}
-
                     <span className="text-xs opacity-75 ml-2">
                       {new Date(
                         photos[currentPhotoIndex].createdAt
@@ -1426,73 +1480,44 @@ export default function GalleryPage() {
             </div>
           )}
 
-          {/* Pagination - only show in grid view or selection/deletion mode */}
-          {(viewMode === "grid" || viewMode === "selection") &&
-            pagination &&
-            pagination.pages > 1 && (
-              <div className="flex justify-center mt-8">
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handlePageChange(pagination.currentPage - 1)}
-                    disabled={pagination.currentPage === 1}
-                    className={`px-3 py-1 rounded-md ${
-                      pagination.currentPage === 1
-                        ? "bg-mono-100 text-mono-400 cursor-not-allowed"
-                        : "bg-mono-200 hover:bg-mono-300"
-                    }`}
-                  >
-                    Previous
-                  </button>
-
-                  {Array.from({ length: pagination.pages }, (_, i) => i + 1)
-                    .filter(
-                      (page) =>
-                        page === 1 ||
-                        page === pagination.pages ||
-                        Math.abs(page - pagination.currentPage) <= 1
-                    )
-                    .map((page, index, array) => {
-                      // Add ellipsis
-                      if (index > 0 && page - array[index - 1] > 1) {
-                        return (
-                          <span
-                            key={`ellipsis-${page}`}
-                            className="px-3 py-1 text-mono-400"
-                          >
-                            ...
-                          </span>
-                        );
-                      }
-
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => handlePageChange(page)}
-                          className={`px-3 py-1 rounded-md ${
-                            pagination.currentPage === page
-                              ? "bg-secondary-400 text-white"
-                              : "bg-mono-200 hover:bg-mono-300"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    })}
-
-                  <button
-                    onClick={() => handlePageChange(pagination.currentPage + 1)}
-                    disabled={pagination.currentPage === pagination.pages}
-                    className={`px-3 py-1 rounded-md ${
-                      pagination.currentPage === pagination.pages
-                        ? "bg-mono-100 text-mono-400 cursor-not-allowed"
-                        : "bg-mono-200 hover:bg-mono-300"
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
+          {/* Load More button as fallback */}
+          {hasMore && (
+            <>
+              <div
+                ref={loadingRef}
+                className="flex justify-center items-center p-4 mt-4"
+              >
+                {isLoading && (
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 h-8 border-4 border-secondary-400 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="mt-2 text-mono-400">Loading more photos...</p>
+                  </div>
+                )}
               </div>
-            )}
+
+              {!isLoading && hasMore && (
+                <div className="flex justify-center mt-4 mb-8">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      console.log("🖱️ Load more button clicked");
+                      loadMorePhotos();
+                    }}
+                    className="px-6 py-2"
+                  >
+                    Load More Photos
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Reached end message */}
+          {!hasMore && photos.length > 12 && (
+            <div className="text-center py-8 text-mono-400">
+              You have reached the end of the gallery
+            </div>
+          )}
         </>
       )}
     </div>
