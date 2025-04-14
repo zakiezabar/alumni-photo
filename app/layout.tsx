@@ -7,6 +7,7 @@ import Navigation from "@/components/Navigation";
 import { Camera } from "lucide-react";
 import { HyperText } from "@/components/magicui/hyper-text";
 import { ToastProvider } from "@/components/ui/use-toast";
+import Footer from "@/components/Footer";
 
 // const spaceMono = Space_Mono({
 //   subsets: ["latin"],
@@ -41,6 +42,7 @@ export default function RootLayout({
             <ToastProvider>
               <div className="min-h-screen block md:flex justify-center w-full p-4 bg-secondary-800">
                 {children}
+                <Footer />
               </div>
             </ToastProvider>
           </ClerkLoaded>

@@ -24,7 +24,7 @@ export default function Home() {
   const confettiRef = useRef<ConfettiRef>(null);
 
   return (
-    <div className="h-screen flex items-center pt-24 flex-col gap-8 w-full lg:w-[500px]">
+    <div className="flex items-center pt-24 flex-col gap-8 w-full lg:w-[500px]">
       <div className="relative w-62 h-62">
         <Image
           src="/images/group-photo.jpeg"
