@@ -2,38 +2,36 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-// Define a type extension for Navigator with the standalone property
-interface NavigatorWithStandalone extends Navigator {
-  standalone?: boolean;
-}
-
 export default function ExternalBrowserRequired() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [redirectUrl, setRedirectUrl] = useState("");
+  const [fullUrl, setFullUrl] = useState("");
 
   useEffect(() => {
     // Get the redirect URL from query params
     const redirect = searchParams?.get("redirect") || "/sign-in";
-    setRedirectUrl(redirect);
+    
+    // Store the full URL including origin
+    setFullUrl(`${window.location.origin}${redirect}`);
 
-    // Check if we're already in an external browser
+    // Check if we're already in an external browser (more robust check)
     const isStillInAppBrowser = () => {
       const ua = navigator.userAgent;
       
-      // Use a proper type check
-      const nav = navigator as NavigatorWithStandalone;
-      const isStandalone = 'standalone' in navigator ? nav.standalone : undefined;
-      
+      // More comprehensive check without unused variables
       return (
         ua.includes('Instagram') || 
         ua.includes('FBAV') || 
+        ua.includes('FBAN') ||
         ua.includes('Twitter') ||
         ua.includes('LinkedInApp') ||
-        (isStandalone === undefined && 
-         ua.includes('Mobile') && 
-         !ua.includes('Safari') &&
-         !ua.includes('Chrome'))
+        ua.includes('TikTok') ||
+        // iOS specific in-app browser detection
+        (ua.includes('iPhone') && 
+         ua.includes('AppleWebKit') && 
+         !ua.includes('CriOS') && 
+         !ua.includes('FxiOS') && 
+         !ua.includes('Safari/'))
       );
     };
 
@@ -43,8 +41,21 @@ export default function ExternalBrowserRequired() {
     }
   }, [router, searchParams]);
 
+  // Multiple methods to try to open external browser
   const handleOpenBrowser = () => {
-    window.open(redirectUrl, "_blank");
+    // Method 1: window.open
+    window.open(fullUrl, "_blank");
+    
+    // Method 2: Create and click a link
+    setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = fullUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, 300);
   };
 
   return (
@@ -56,10 +67,20 @@ export default function ExternalBrowserRequired() {
       </p>
       <button
         onClick={handleOpenBrowser}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md"
+        className="px-4 py-2 bg-blue-600 text-white rounded-md mb-4"
       >
         Open in Browser
       </button>
+      
+      {/* Add a manual fallback option */}
+      <div className="mt-4 p-4 bg-gray-100 rounded-md max-w-md">
+        <p className="text-sm text-gray-700 mb-2">
+          If the button doesn&apos;t work, copy this URL and paste it in your browser:
+        </p>
+        <div className="p-2 bg-white rounded border mt-2 text-xs break-all">
+          {fullUrl}
+        </div>
+      </div>
     </div>
   );
 }

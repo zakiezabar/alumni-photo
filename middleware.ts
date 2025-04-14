@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
@@ -16,13 +16,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/gallery",
   "/api/gallery",
-  '/external-browser-required',
+  "/external-browser-required",
 ]);
 
-const isAuthRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-])
+const isAuthRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
   // Check if this is an auth route and potentially in an in-app browser
@@ -30,20 +27,28 @@ export default clerkMiddleware(async (auth, req) => {
     const userAgent = req.headers.get("user-agent") || "";
     const isLikelyInAppBrowser =
       userAgent.includes("Instagram") ||
-      userAgent.includes("FBAV") || // Facebook
+      userAgent.includes("FBAV") || // Facebook app
+      userAgent.includes("FBAN") || // Facebook app
       userAgent.includes("Twitter") ||
-      userAgent.includes("LinkedInApp") ||
-      // Add other common in-app browser identifiers
-      (userAgent.includes("Mobile") &&
-        !userAgent.includes("Safari") &&
-        !userAgent.includes("Chrome"));
+      userAgent.includes("TikTok") ||
+      userAgent.includes("LinkedIn") ||
+      // iOS specific in-app browser detection
+      (userAgent.includes("iPhone") &&
+        userAgent.includes("AppleWebKit") &&
+        !userAgent.includes("CriOS") && // Not Chrome
+        !userAgent.includes("FxiOS") && // Not Firefox
+        !userAgent.includes("Safari/"));
 
     if (isLikelyInAppBrowser) {
-      // Redirect to a page that will handle opening in external browser
-      const url = new URL("/external-browser-required", req.url);
-      // Preserve the original destination
-      url.searchParams.set("redirect", req.url);
-      return NextResponse.redirect(url);
+      // Create the full URL with origin for the redirect parameter
+      const currentUrl = new URL(req.url);
+      const redirectURL = new URL("/external-browser-required", req.url);
+      redirectURL.searchParams.set(
+        "redirect",
+        currentUrl.pathname + currentUrl.search
+      );
+
+      return NextResponse.redirect(redirectURL);
     }
   }
 
