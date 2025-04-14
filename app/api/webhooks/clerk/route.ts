@@ -57,7 +57,7 @@ export async function POST(req: Request) {
   // CREATE USER IN MONGO DB
 
   if (eventType === 'user.created') {
-    const { id, email_addresses, image_url, first_name, last_name, username, role } = evt.data;
+    const { id, email_addresses, image_url, first_name, last_name, username} = evt.data;
 
     const user = {
         clerkId: id,
@@ -65,8 +65,7 @@ export async function POST(req: Request) {
         username: username!,
         firstName: first_name,
         lastName: last_name,
-        photo: image_url,
-        role: role
+        photo: image_url
     };
 
     console.log(user);
