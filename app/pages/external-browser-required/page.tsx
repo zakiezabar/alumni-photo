@@ -77,7 +77,7 @@ export default function ExternalBrowserRequired() {
         <p className="text-sm text-gray-700 mb-2">
           If the button doesn&apos;t work, copy this URL and paste it in your browser:
         </p>
-        <div className="p-2 bg-white rounded border mt-2 text-xs break-all">
+        <div className="p-2 bg-white rounded border mt-2 text-sm text-mono-800 break-all">
           {fullUrl}
         </div>
       </div>
