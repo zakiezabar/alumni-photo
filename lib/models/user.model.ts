@@ -18,30 +18,19 @@ const UserSchema = new Schema({
     },
     photo: {
         type: String,
-        required: true,
+        required: false,
+        default: 'https://via.placeholder.com/150'
     },
     firstName: {
         type: String,
-        required: true,
+        required: false,
+        default: ''
     },
     lastName: {
         type: String,
-        required: true,
-    },
-    role: {
-        type: String,
-        enum: ['USER', 'ADMIN'],
-        default: 'USER',
         required: false,
+        default: ''
     },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-    updatedAt: {
-        type: Date,
-        default: Date.now,
-    }
 });
 
 const User = models?.User || model('User', UserSchema);

@@ -5,12 +5,22 @@ import { connect } from "@/lib/db";
 
 export async function createUser(user: any) {
   try {
-      await connect();
-      const newUser = await User.create(user);
-      console.log(newUser)
-      return JSON.parse(JSON.stringify(newUser));
+    await connect();
+    
+    // Check if user already exists first
+    const existingUser = await User.findOne({ clerkId: user.clerkId });
+    if (existingUser) {
+      console.log('User already exists in MongoDB:', existingUser._id);
+      return JSON.parse(JSON.stringify(existingUser));
+    }
+    
+    const newUser = await User.create(user);
+    console.log('User created successfully:', newUser._id);
+    return JSON.parse(JSON.stringify(newUser));
   } catch (error) {
-      console.log(error);
+    console.error('Error creating user:', error);
+    // Important: Rethrow the error so the webhook handler can handle it
+    throw error;
   }
 }
 
