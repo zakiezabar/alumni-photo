@@ -16,7 +16,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/gallery",
   "/api/gallery",
-  "/external-browser-required",
+  "/pages/external-browser-required",
 ]);
 
 const isAuthRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
@@ -42,7 +42,7 @@ export default clerkMiddleware(async (auth, req) => {
     if (isLikelyInAppBrowser) {
       // Create the full URL with origin for the redirect parameter
       const currentUrl = new URL(req.url);
-      const redirectURL = new URL("/external-browser-required", req.url);
+      const redirectURL = new URL("/pages/external-browser-required", req.url);
       redirectURL.searchParams.set(
         "redirect",
         currentUrl.pathname + currentUrl.search

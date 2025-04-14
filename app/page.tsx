@@ -50,7 +50,7 @@ export default function Home() {
     
     if (isInAppBrowser()) {
       // Redirect to the external browser page with signin as the redirect destination
-      router.push('/external-browser-required?redirect=/sign-in');
+      router.push('/pages/external-browser-required?redirect=/sign-in');
     } else {
       // Continue to signin page normally
       router.push('/sign-in');
