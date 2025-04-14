@@ -21,7 +21,7 @@ model User {
   firstName String?
   lastName  String?
   photo     String?
-  role      UserRole @default(USER)
+  role      UserRole? @default(USER)
   createdAt DateTime? // Made optional with ? to handle null values
   updatedAt DateTime? // Made optional with ? to handle null values
   photos    Photo[]

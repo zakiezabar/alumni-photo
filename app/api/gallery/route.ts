@@ -44,8 +44,14 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "12");
     const countOnly = searchParams.get("count") === "true";
 
-    // Get total count for pagination
-    const totalPhotos = await prisma.photo.count();
+    // Use a valid user filter - checking that userId exists in the users table
+    const totalPhotos = await prisma.photo.count({
+      where: {
+        userId: {
+          in: await prisma.user.findMany().then(users => users.map(user => user.id))
+        }
+      }
+    });
     
     // If count-only is requested, return just the count
     if (countOnly) {
@@ -61,19 +67,27 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    // Fetch photos with pagination
+    // Get all valid user IDs
+    const validUserIds = await prisma.user.findMany().then(users => users.map(user => user.id));
+
+    // Fetch photos with pagination - only those with valid users
     const photos = await prisma.photo.findMany({
       skip,
       take: limit,
       orderBy: {
         createdAt: "desc",
       },
+      where: {
+        userId: {
+          in: validUserIds
+        }
+      },
       include: {
         user: {
           select: {
             firstName: true,
             lastName: true,
-            photo: true, // Using 'photo' instead of 'avatar'
+            photo: true,
           },
         },
       },
@@ -91,9 +105,6 @@ export async function GET(request: NextRequest) {
         avatar: photo.user.photo
       }
     }));
-
-    // Get total count for pagination
-    // const totalPhotos = await prisma.photo.count();
 
     return NextResponse.json({
       photos: formattedPhotos,
