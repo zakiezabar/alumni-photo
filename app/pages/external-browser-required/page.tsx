@@ -59,7 +59,7 @@ export default function ExternalBrowserRequired() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center text-mono-200">
       <h1 className="text-2xl font-bold mb-4">External Browser Required</h1>
       <p className="mb-6">
         For security reasons, Google sign-in cannot be completed in an in-app
@@ -67,7 +67,7 @@ export default function ExternalBrowserRequired() {
       </p>
       <button
         onClick={handleOpenBrowser}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md mb-4"
+        className="px-4 py-2 bg-primary-400 text-mono-800 rounded-md mb-4"
       >
         Open in Browser
       </button>
