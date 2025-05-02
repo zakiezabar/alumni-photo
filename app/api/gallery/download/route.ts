@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
             
             // Create a filename based on photo details
             const timestamp = photo.createdAt 
-              ? new Date(photo.createdAt).toISOString().substring(0, 10) 
+              ? new Date(photo.createdAt).toISOString().replace(/[:T]/g, '-').substring(0, 19)
               : 'unknown-date';
             
             const description = photo.description 
