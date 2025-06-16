@@ -61,7 +61,7 @@ export default function Home() {
     <div className="flex items-center pt-24 flex-col gap-8 w-full lg:w-[500px]">
       <div className="relative w-62 h-62">
         <Image
-          src="/images/group-photo.jpeg"
+          src="/images/graduate-02.png"
           fill
           alt="silhouette graduation"
           className="rounded-full object-cover border-2 border-primary-400"

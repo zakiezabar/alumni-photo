@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
 import { Menu, X } from "lucide-react";
 import { Space_Mono } from "next/font/google";
+import Image from "next/image";
 
 const spaceMono = Space_Mono({
   weight: ["400", "700"],
@@ -27,25 +28,39 @@ export default function Navigation() {
   ];
 
   return (
-    <nav className="bg-primary-400 shadow-sm">
+    <nav className="bg-primary-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className={`${spaceMono.className} text-xl font-bold text-secondary-400`}>
-                Share moments!
+              <Link
+                href="/"
+                className={`${spaceMono.className} text-xl font-bold text-secondary-400`}
+              >
+                <Image
+                src="/id50uitm-logo-full.png"
+                alt="id50uitm-logo"
+                width={320}
+                height={124}
+                className="mr-3"
+              />
               </Link>
             </div>
           </div>
 
           {/* Desktop navigation */}
-          <div className={`${spaceMono.className} hidden sm:ml-6 sm:flex sm:space-x-8`}>
+          <div
+            className={`${spaceMono.className} hidden sm:ml-6 sm:flex sm:space-x-8`}
+          >
             {navigation.map((item) => {
               // Don't show Upload and My Photos if not signed in
-              if (!isSignedIn && (item.href === "/upload" || item.href === "/dashboard")) {
+              if (
+                !isSignedIn &&
+                (item.href === "/upload" || item.href === "/dashboard")
+              ) {
                 return null;
               }
-              
+
               return (
                 <Link
                   key={item.name}
@@ -61,7 +76,7 @@ export default function Navigation() {
               );
             })}
           </div>
-          
+
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
             {isSignedIn ? (
               <UserButton afterSignOutUrl="/" />
@@ -73,7 +88,7 @@ export default function Navigation() {
               </SignInButton>
             )}
           </div>
-          
+
           {/* Mobile menu button */}
           <div className="flex items-center sm:hidden">
             <button
@@ -89,17 +104,20 @@ export default function Navigation() {
           </div>
         </div>
       </div>
-      
+
       {/* Mobile menu */}
       {isMenuOpen && (
         <div className="sm:hidden">
           <div className="pt-2 pb-3 space-y-1">
             {navigation.map((item) => {
               // Don't show Upload and My Photos if not signed in
-              if (!isSignedIn && (item.href === "/upload" || item.href === "/dashboard")) {
+              if (
+                !isSignedIn &&
+                (item.href === "/upload" || item.href === "/dashboard")
+              ) {
                 return null;
               }
-              
+
               return (
                 <Link
                   key={item.name}
@@ -116,7 +134,7 @@ export default function Navigation() {
               );
             })}
           </div>
-          
+
           <div className="pt-4 pb-3 border-t border-mono-200">
             <div className="flex items-center px-4">
               {isSignedIn ? (

@@ -13,6 +13,17 @@ enum UserRole {
   ADMIN
 }
 
+enum EventVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum PackageType {
+  FREE
+  PREMIUM
+  CUSTOM
+}
+
 model User {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   clerkId   String   @unique
@@ -25,6 +36,12 @@ model User {
   createdAt DateTime? // Made optional with ? to handle null values
   updatedAt DateTime? // Made optional with ? to handle null values
   photos    Photo[]
+  ownedEvents   Event[]   @relation("EventOwner")
+  joinedEvents  EventMember[]
+  comments      Comment[]
+  photoLikes    PhotoLike[]
+  photoTags     PhotoTag[]
+  inboxMessages InboxMessage[]
 
   @@map("users") // Make sure this matches your collection name in clerk-db
 }
@@ -38,6 +55,123 @@ model Photo {
   createdAt   DateTime? @default(now()) // Made optional with ? to handle null values
   description String?
   moderation  Json?    // Store moderation results if needed
+  eventId     String?   @db.ObjectId
+  event       Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  likes       PhotoLike[]
+  comments    Comment[]
+  tags        PhotoTag[]
   
   @@map("photos")
+}
+
+model Event {
+  id                 String          @id @default(auto()) @map("_id") @db.ObjectId
+  name               String          @unique
+  slug               String          @unique
+  description        String?
+  eventDate          DateTime
+  visibility         EventVisibility @default(PUBLIC)
+  packageType        PackageType     @default(FREE)
+  userUploadLimit    Int             // Photos per user
+  totalUploadLimit   Int             // Total photos for the event
+  ownerId            String          @db.ObjectId
+  owner              User            @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  members            EventMember[]
+  photos             Photo[]
+  inboxMessages      InboxMessage[]
+  membershipRequests MemberRequest[]
+  subscriptionId     String?         // For premium/platinum subscriptions
+  customSettings     Json?           // For platinum custom settings
+
+  @@map("events")
+}
+
+model EventMember {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId   String   @db.ObjectId
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  joinedAt  DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  @@unique([userId, eventId])
+  @@map("eventMembers")
+}
+
+model MemberRequest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  eventId   String   @db.ObjectId
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  status    String   @default("pending") // pending, approved, rejected
+  requestedAt DateTime @default(now())
+  processedAt DateTime?
+
+  @@unique([email, eventId])
+  @@map("memberRequests")
+}
+
+model Comment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  photoId   String   @db.ObjectId
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("comments")
+}
+
+model PhotoLike {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  photoId   String   @db.ObjectId
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([photoId, userId])
+  @@map("photoLikes")
+}
+
+model PhotoTag {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  photoId   String   @db.ObjectId
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([photoId, userId])
+  @@map("photoTags")
+}
+
+model InboxMessage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  eventId   String   @db.ObjectId
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("inboxMessages")
+}
+
+model Subscription {
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  stripeCustomerId        String?
+  stripeSubscriptionId    String?
+  stripePriceId           String?
+  stripeCurrentPeriodEnd  DateTime?
+  packageType             PackageType
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("subscriptions")
 }

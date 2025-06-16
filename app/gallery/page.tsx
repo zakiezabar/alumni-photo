@@ -1051,9 +1051,9 @@ export default function GalleryPage() {
         </div>
       ) : photos.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-lg mb-4">No photos have been uploaded yet.</p>
+          <p className="text-lg text-mono-200 mb-4">No photos have been uploaded yet.</p>
           {isSignedIn ? (
-            <Link href="/upload" className="text-secondary-400 hover:underline">
+            <Link href="/upload" className="text-xl text-primary-500 hover:underline">
               Be the first to upload a photo!
             </Link>
           ) : (
