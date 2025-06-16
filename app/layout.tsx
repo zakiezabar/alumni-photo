@@ -18,7 +18,7 @@ import Footer from "@/components/Footer";
 const font = Nunito_Sans({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Share moments",
+  title: "50th Anniversary of UITM Interior Design Program",
   description: "Capture. Upload. Relive the moments",
 };
 
