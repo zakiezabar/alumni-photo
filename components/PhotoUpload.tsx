@@ -9,7 +9,7 @@ interface PhotoUploadProps {
   maxPhotos?: number;
 }
 
-const PhotoUpload = ({ onPhotosChange, maxPhotos = 10 }: PhotoUploadProps) => {
+const PhotoUpload = ({ onPhotosChange, maxPhotos = 20 }: PhotoUploadProps) => {
   const [photos, setPhotos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
