@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const MAX_UPLOADS = 10;
+    const MAX_UPLOADS = 20;
     if (photoCount >= MAX_UPLOADS) {
       return NextResponse.json(
         { 

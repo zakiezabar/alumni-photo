@@ -1327,7 +1327,7 @@ export default function GalleryPage() {
                     }
                   `}
                 >
-                  <div className="relative max-w-full max-h-full overflow-hidden">
+                  <div className="relative max-w-full max-h-full ">
                     <div
                       key={photos[currentPhotoIndex].id}
                       style={{

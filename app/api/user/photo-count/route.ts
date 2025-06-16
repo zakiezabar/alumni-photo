@@ -32,7 +32,7 @@ export async function GET() {
       },
     });
 
-    const maxUploads = 10;
+    const maxUploads = 20;
     const remainingUploads = Math.max(0, maxUploads - photoCount);
 
     return NextResponse.json({

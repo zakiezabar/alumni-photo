@@ -29,11 +29,11 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadCount, setUploadCount] = useState(0);
-  const [remainingUploads, setRemainingUploads] = useState(10);
+  const [remainingUploads, setRemainingUploads] = useState(20);
   const [totalGalleryCount, setTotalGalleryCount] = useState(0);
   const [isLoadingCounts, setIsLoadingCounts] = useState(true);
   const [overallProgress, setOverallProgress] = useState(0);
-  const maxUploads = 10;
+  const maxUploads = 20;
 
   // Redirect if not signed in
   useEffect(() => {
@@ -187,7 +187,7 @@ export default function UploadPage() {
 
     // Check if user has reached upload limit
     if (remainingUploads <= 0) {
-      setError("You've reached the maximum number of uploads (10 photos).");
+      setError("You've reached the maximum number of uploads (20 photos).");
       return;
     }
 
@@ -374,7 +374,7 @@ export default function UploadPage() {
   );
 
   return (
-    <div className="h-screen max-w-2xl mx-auto p-4 justify-center">
+    <div className="h-full max-w-2xl mx-auto p-4 justify-center">
       <h1 className="text-2xl font-bold mb-6 text-center text-primary-400">
         Share Your Best Moments!
       </h1>
